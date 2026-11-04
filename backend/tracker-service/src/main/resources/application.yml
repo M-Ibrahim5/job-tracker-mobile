@@ -1,0 +1,15 @@
+spring:
+  application:
+    name: tracker-service
+  config:
+    import: classpath:jobtrail-common.yml,optional:file:.env[.properties],optional:file:../.env[.properties],optional:file:backend/.env[.properties]
+
+server:
+  port: ${TRACKER_SERVICE_PORT:3002}
+
+jobtrail:
+  version: "@project.version@"
+  # Read notifications are deleted this many days after they became visible (nightly job).
+  notification-retention-days: ${NOTIFICATION_RETENTION_DAYS:365}
+  services:
+    user-url: ${USER_SERVICE_URL:http://127.0.0.1:3001}
