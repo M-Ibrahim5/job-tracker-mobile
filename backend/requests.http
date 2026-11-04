@@ -1,0 +1,238 @@
+### JobTrail API — one request per endpoint (VS Code "REST Client" / JetBrains HTTP Client)
+### Run "login" first; later requests reuse its tokens.
+
+@base = http://localhost:3000/api/v1
+@tz = Asia/Kuala_Lumpur
+
+### Health
+GET {{base}}/health
+
+### Register
+POST {{base}}/auth/register
+Content-Type: application/json
+
+{ "fullName": "Muhammad Ibrahim", "email": "ibrahim@example.com", "password": "Passw0rd!" }
+
+### Login (seeded user: demo@jobtrail.test / Demo@1234)
+# @name login
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{ "email": "demo@jobtrail.test", "password": "Demo@1234" }
+
+###
+@token = {{login.response.body.accessToken}}
+@refresh = {{login.response.body.refreshToken}}
+
+### Refresh (rotates the refresh token)
+POST {{base}}/auth/refresh
+Content-Type: application/json
+
+{ "refreshToken": "{{refresh}}" }
+
+### Forgot password (logs the link server-side)
+POST {{base}}/auth/forgot-password
+Content-Type: application/json
+
+{ "email": "demo@jobtrail.test" }
+
+### Change password
+POST {{base}}/auth/change-password
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "currentPassword": "Demo@1234", "newPassword": "Demo@12345", "refreshToken": "{{refresh}}" }
+
+### Logout
+POST {{base}}/auth/logout
+Content-Type: application/json
+
+{ "refreshToken": "{{refresh}}" }
+
+### Me
+GET {{base}}/me
+Authorization: Bearer {{token}}
+
+### Update profile
+PATCH {{base}}/me
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "fullName": "Demo User", "currentRole": "Software Engineer", "location": "Kuala Lumpur, Malaysia" }
+
+### Upload avatar
+POST {{base}}/me/avatar
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=X
+
+--X
+Content-Disposition: form-data; name="file"; filename="avatar.png"
+Content-Type: image/png
+
+< ./avatar.png
+--X--
+
+### Settings
+GET {{base}}/me/settings
+Authorization: Bearer {{token}}
+
+### Update settings
+PATCH {{base}}/me/settings
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "theme": "dark", "defaultFollowUpDays": 7, "defaultReminderOffsetsMinutes": [1440, 60] }
+
+### List applications
+GET {{base}}/applications?q=flutter&status=interview,offer&sort=status&page=1&pageSize=20
+Authorization: Bearer {{token}}
+
+### Create application
+# @name created
+POST {{base}}/applications
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "jobTitle": "Senior Flutter Developer",
+  "companyName": "Northwind Labs",
+  "location": "Kuala Lumpur",
+  "workArrangement": "hybrid",
+  "employmentType": "fullTime",
+  "source": "linkedIn",
+  "appliedDate": "2026-10-22",
+  "applicationLink": "https://example.com/jobs/123",
+  "contactName": "Aisha Rahman",
+  "contactEmail": "aisha@northwind.example"
+}
+
+###
+@appId = {{created.response.body.id}}
+
+### Get application
+GET {{base}}/applications/{{appId}}
+Authorization: Bearer {{token}}
+
+### Update application (status is ignored here)
+PATCH {{base}}/applications/{{appId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "notes": "Ask about on-call", "followUpAt": "2026-11-01T01:00:00.000Z" }
+
+### Change status
+POST {{base}}/applications/{{appId}}/status
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "status": "interview", "note": "Recruiter called" }
+
+### Status history
+GET {{base}}/applications/{{appId}}/history
+Authorization: Bearer {{token}}
+
+### Timeline (history + interviews)
+GET {{base}}/applications/{{appId}}/timeline
+Authorization: Bearer {{token}}
+
+### Create interview
+# @name interview
+POST {{base}}/applications/{{appId}}/interviews
+Authorization: Bearer {{token}}
+X-Timezone: {{tz}}
+Content-Type: application/json
+
+{
+  "title": "Technical interview · Round 2",
+  "type": "video",
+  "scheduledAt": "2026-12-01T02:00:00.000Z",
+  "durationMinutes": 60,
+  "locationOrLink": "https://meet.example.com/abc",
+  "reminderOffsetsMinutes": [1440, 60]
+}
+
+###
+@interviewId = {{interview.response.body.id}}
+
+### List interviews
+GET {{base}}/interviews?scope=upcoming&page=1&pageSize=20
+Authorization: Bearer {{token}}
+
+### Get interview
+GET {{base}}/interviews/{{interviewId}}
+Authorization: Bearer {{token}}
+
+### Update interview (reschedules reminders)
+PATCH {{base}}/interviews/{{interviewId}}
+Authorization: Bearer {{token}}
+X-Timezone: {{tz}}
+Content-Type: application/json
+
+{ "scheduledAt": "2026-12-02T02:00:00.000Z", "outcome": "pending" }
+
+### Delete interview
+DELETE {{base}}/interviews/{{interviewId}}
+Authorization: Bearer {{token}}
+
+### Notifications
+GET {{base}}/notifications?page=1&pageSize=20
+Authorization: Bearer {{token}}
+
+### Unread count
+GET {{base}}/notifications/unread-count
+Authorization: Bearer {{token}}
+
+### Mark one read (replace the id)
+POST {{base}}/notifications/1/read
+Authorization: Bearer {{token}}
+
+### Mark all read
+POST {{base}}/notifications/read-all
+Authorization: Bearer {{token}}
+
+### Delete one notification (replace the id)
+DELETE {{base}}/notifications/1
+Authorization: Bearer {{token}}
+
+### Clear all notifications
+DELETE {{base}}/notifications
+Authorization: Bearer {{token}}
+
+### Upcoming device reminders
+GET {{base}}/reminders/upcoming
+Authorization: Bearer {{token}}
+X-Timezone: {{tz}}
+
+### Dashboard
+GET {{base}}/dashboard?tz={{tz}}
+Authorization: Bearer {{token}}
+
+### Calendar
+GET {{base}}/calendar?from=2026-10-01&to=2026-10-31&tz={{tz}}
+Authorization: Bearer {{token}}
+
+### Export JSON
+GET {{base}}/export?format=json
+Authorization: Bearer {{token}}
+
+### Export CSV
+GET {{base}}/export?format=csv
+Authorization: Bearer {{token}}
+
+### Delete application
+DELETE {{base}}/applications/{{appId}}
+Authorization: Bearer {{token}}
+
+### Delete all data (keeps the account)
+DELETE {{base}}/data
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "confirm": "DELETE" }
+
+### Delete account
+DELETE {{base}}/me
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "password": "Demo@1234" }

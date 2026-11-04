@@ -1,0 +1,50 @@
+# Shared by every JobTrail service via `spring.config.import: classpath:jobtrail-common.yml`.
+# Environment variables (or backend/.env, git-ignored) override the defaults.
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/jobtrail?allowPublicKeyRetrieval=true&useSSL=false}
+    username: ${DB_USER:jobtrail}
+    password: ${DB_PASSWORD:}
+    hikari:
+      # DATETIME(3) defaults (CURRENT_TIMESTAMP) must be UTC like everything else we store.
+      connection-init-sql: SET time_zone = '+00:00'
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    # Databases created earlier by Prisma already contain the V1 tables.
+    baseline-on-migrate: true
+    baseline-version: 1
+  jackson:
+    # Jackson 3 writes dates as ISO strings by default; Instants use JacksonConfig's format.
+    default-property-inclusion: always
+  mvc:
+    throw-exception-if-no-handler-found: false
+  main:
+    banner-mode: "off"
+
+server:
+  # Only the gateway should reach the services: listen on loopback unless told otherwise
+  # (set SERVICE_BIND_ADDRESS to a private interface when services run on separate hosts).
+  address: ${SERVICE_BIND_ADDRESS:127.0.0.1}
+  tomcat:
+    # The gateway keeps pooled connections open; keep them longer than its 45s idle time and never
+    # close one after a fixed number of requests (Tomcat's default 100), which raced with reuse.
+    keep-alive-timeout: 60s
+    max-keep-alive-requests: -1
+    # Listen backlog: connections waiting to be accepted during a burst (default 100). When it
+    # overflows, the client's SYN is dropped and retried seconds later.
+    accept-count: 1024
+
+jobtrail:
+  # Largest JSON request body; multipart uploads have their own limits.
+  max-body-size: ${MAX_BODY_SIZE:1MB}
+  public-base-url: ${PUBLIC_BASE_URL:http://localhost:3000}
+  jwt:
+    secret: ${JWT_SECRET:}
+    access-ttl: ${JWT_ACCESS_TTL:15m}
+  internal:
+    key: ${INTERNAL_API_KEY:}
+
+logging:
+  level:
+    root: ${LOG_LEVEL:info}
