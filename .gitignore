@@ -1,0 +1,15 @@
+*.env
+.DS_Store
+*.jks
+*.keystore
+key.properties
+target/
+uploads/
+# IDE and build output
+.idea/
+build/
+.dart_tool/
+
+# Local run notes (machine-specific paths)
+FE-run.txt
+*.iml
