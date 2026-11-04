@@ -1,0 +1,7 @@
+spring:
+  application:
+    name: seed
+  config:
+    import: classpath:jobtrail-common.yml,optional:file:.env[.properties],optional:file:../.env[.properties],optional:file:backend/.env[.properties]
+  main:
+    web-application-type: none
