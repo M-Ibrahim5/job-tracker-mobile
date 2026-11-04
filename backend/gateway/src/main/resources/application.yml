@@ -1,0 +1,76 @@
+spring:
+  application:
+    name: gateway
+  config:
+    import: optional:file:.env[.properties],optional:file:../.env[.properties],optional:file:backend/.env[.properties]
+  main:
+    banner-mode: "off"
+  cloud:
+    gateway:
+      server:
+        webflux:
+          # Connections to the services: pooled connections are dropped before Tomcat's keep-alive
+          # timeout (60s, jobtrail-common.yml) so the gateway never reuses one the service is closing
+          # ("Connection prematurely closed BEFORE response" -> 500 under load). A stuck service
+          # answers 504 after response-timeout instead of holding the client indefinitely.
+          httpclient:
+            connect-timeout: 2000
+            response-timeout: 30s
+            pool:
+              max-idle-time: 45s
+              max-life-time: 5m
+              eviction-interval: 10s
+          # Only the paths below are public. /internal/** is deliberately not routed.
+          # RequestSize rejects bodies whose Content-Length is too large with 413 before they are
+          # proxied; the services also cap streamed (chunked) bodies themselves.
+          routes:
+            - id: user-avatar
+              uri: ${jobtrail.services.user-url}
+              predicates:
+                - Path=/api/v1/me/avatar
+              filters:
+                - name: RequestSize
+                  args:
+                    maxSize: ${jobtrail.gateway.max-upload-size}
+            - id: user-service
+              uri: ${jobtrail.services.user-url}
+              predicates:
+                - Path=/api/v1/auth/**,/api/v1/me/**,/uploads/**
+              filters:
+                - name: RequestSize
+                  args:
+                    maxSize: ${jobtrail.gateway.max-body-size}
+            - id: tracker-service
+              uri: ${jobtrail.services.tracker-url}
+              predicates:
+                - Path=/api/v1/applications/**,/api/v1/interviews/**,/api/v1/notifications/**,/api/v1/reminders/**,/api/v1/dashboard/**,/api/v1/calendar/**,/api/v1/export/**,/api/v1/data/**
+              filters:
+                - name: RequestSize
+                  args:
+                    maxSize: ${jobtrail.gateway.max-body-size}
+
+server:
+  port: ${PORT:3000}
+
+jobtrail:
+  version: "@project.version@"
+  services:
+    user-url: ${USER_SERVICE_URL:http://127.0.0.1:3001}
+    tracker-url: ${TRACKER_SERVICE_URL:http://127.0.0.1:3002}
+  gateway:
+    api-limit: ${API_RATE_LIMIT:300}
+    auth-limit: ${AUTH_RATE_LIMIT:10}
+    token-limit: ${TOKEN_RATE_LIMIT:120}
+    trust-forwarded-for: ${TRUST_FORWARDED_FOR:false}
+    # e.g. redis://:password@redis-host:6379/0 — shares rate limits between gateway instances.
+    # Empty: counted in this process only.
+    redis-url: ${REDIS_URL:}
+    max-body-size: ${MAX_BODY_SIZE:1MB}
+    max-upload-size: ${MAX_UPLOAD_SIZE:3MB}
+  # Same secret as the services; only used to key rate limits by user. Empty = key by IP only.
+  jwt:
+    secret: ${JWT_SECRET:}
+
+logging:
+  level:
+    root: ${LOG_LEVEL:info}
