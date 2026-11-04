@@ -1,0 +1,23 @@
+# Integration tests run against the local MySQL schema `jobtrail_test` (see docs/sql/00-create-databases.sql).
+spring:
+  datasource:
+    url: ${TEST_DB_URL:jdbc:mysql://localhost:3306/jobtrail_test?allowPublicKeyRetrieval=true&useSSL=false}
+    username: ${TEST_DB_USER:jobtrail}
+    password: ${TEST_DB_PASSWORD:}
+
+jobtrail:
+  public-base-url: http://localhost:3000
+  jwt:
+    secret: test-secret-test-secret-test-secret-123
+  internal:
+    key: test-internal-key
+  upload-dir: target/test-uploads
+  # Cheap hashing so the suite stays fast; production uses the defaults (64 MiB, 3 passes).
+  argon2:
+    memory-kb: 1024
+    iterations: 1
+    parallelism: 1
+
+logging:
+  level:
+    root: warn

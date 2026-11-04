@@ -1,0 +1,20 @@
+spring:
+  application:
+    name: user-service
+  config:
+    import: classpath:jobtrail-common.yml,optional:file:.env[.properties],optional:file:../.env[.properties],optional:file:backend/.env[.properties]
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 3MB
+
+server:
+  port: ${USER_SERVICE_PORT:3001}
+
+jobtrail:
+  version: "@project.version@"
+  upload-dir: ${UPLOAD_DIR:./uploads}
+  refresh-ttl-days: ${REFRESH_TTL_DAYS:30}
+  argon2:
+    # Password hashes running at once; 0 = one per CPU core.
+    max-concurrent: ${ARGON2_MAX_CONCURRENT:0}
