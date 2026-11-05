@@ -10,7 +10,6 @@ import '../../../domain/enums/enums.dart';
 import '../../../domain/models/job_application.dart';
 import '../application/application_controllers.dart';
 import '../application/status_flow.dart';
-import 'dashed_border.dart';
 import 'status_celebration_dialog.dart';
 
 /// Opens the status sheet for [application]; resolves to true when the status

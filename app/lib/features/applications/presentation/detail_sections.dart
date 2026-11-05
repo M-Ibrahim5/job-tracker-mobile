@@ -16,7 +16,6 @@ import '../../../domain/models/status_history_entry.dart';
 import '../../interviews/application/interviews_providers.dart';
 import '../application/status_flow.dart';
 import 'application_card.dart';
-import 'dashed_border.dart';
 
 /// Title block: status chip, title, company and info chips.
 class DetailHeader extends StatelessWidget {
