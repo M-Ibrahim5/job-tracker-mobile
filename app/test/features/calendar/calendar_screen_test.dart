@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:jobtrail/app/providers.dart';
 import 'package:jobtrail/core/constants/dashboard_strings.dart';
 import 'package:jobtrail/core/errors/failures.dart';
+import 'package:jobtrail/core/widgets/widgets.dart';
 import 'package:jobtrail/domain/enums/enums.dart';
 import 'package:jobtrail/domain/models/calendar_event.dart';
 import 'package:jobtrail/domain/repositories/misc_repositories.dart';
@@ -268,6 +269,26 @@ void main() {
       }
       expect(
         find.widgetWithText(FloatingActionButton, CalendarStrings.fab),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('Today shows a calendar page with the current date', (
+      tester,
+    ) async {
+      await _pump(tester);
+      final page = find.byKey(const ValueKey('today-page'));
+      expect(page, findsOneWidget);
+      expect(
+        find.descendant(of: page, matching: find.text('OCT')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: page, matching: find.text('27')),
+        findsOneWidget,
+      );
+      expect(
+        find.byTooltip('Jump to today, Tuesday, October 27, 2026'),
         findsOneWidget,
       );
     });
@@ -727,8 +748,8 @@ void main() {
 
   group('job timeline mode', () {
     Future<void> pickCompany(WidgetTester tester, String query) async {
-      await tester.ensureVisible(find.textContaining('Company ▾'));
-      await tester.tap(find.textContaining('Company ▾'));
+      await tester.ensureVisible(find.text(CalendarStrings.pickJob));
+      await tester.tap(find.text(CalendarStrings.pickJob));
       await tester.pumpAndSettle();
       expect(find.text(CalendarStrings.pickJobTitle), findsOneWidget);
       await tester.enterText(find.byType(TextField), query);
@@ -746,7 +767,17 @@ void main() {
       await tester.tap(find.text('Northwind Labs'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Northwind Labs ▾'), findsOneWidget);
+      // The picker card now shows the company, role and current status.
+      final card = find.byKey(const ValueKey('job-picker-selected'));
+      expect(card, findsOneWidget);
+      expect(
+        find.descendant(of: card, matching: find.text('Northwind Labs')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: card, matching: find.byType(StatusChip)),
+        findsOneWidget,
+      );
       expect(find.byType(JobTimelineList), findsOneWidget);
       for (final t in ['Applied', 'Screening', 'Interview']) {
         expect(
@@ -786,13 +817,24 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(JobTimelineList), findsNothing);
-      expect(find.textContaining('Company ▾'), findsOneWidget);
+      expect(find.byKey(const ValueKey('job-picker-empty')), findsOneWidget);
       expect(
         tester
             .widgetList<DayCell>(find.byType(DayCell))
             .any((c) => c.isTimeline),
         isFalse,
       );
+    });
+
+    testWidgets('the selected card can change the job', (tester) async {
+      await _pump(tester, today: DateTime.now, size: const Size(390, 1600));
+      await pickCompany(tester, 'northwind');
+      await tester.tap(find.text('Northwind Labs'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip(CalendarStrings.changeJob));
+      await tester.pumpAndSettle();
+      expect(find.text(CalendarStrings.pickJobTitle), findsOneWidget);
     });
 
     testWidgets('an unmatched search says so', (tester) async {

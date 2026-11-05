@@ -144,12 +144,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                       ),
                     ),
                   ),
-                  OutlinedButton(
+                  TodayButton(
+                    today: DateHelpers.dayOnly(_now),
                     onPressed: _toToday,
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(0, Sizes.minTouch),
-                    ),
-                    child: const Text(CalendarStrings.today),
                   ),
                 ],
               ),
@@ -205,8 +202,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               const SizedBox(height: Spacing.md),
               const CalendarLegend(),
               const SizedBox(height: Spacing.lg),
-              _TimelinePicker(
-                job: job?.companyName,
+              JobTimelinePicker(
+                job: job,
                 onPick: _pickJob,
                 onClear: () =>
                     ref.read(timelineApplicationProvider.notifier).state = null,
@@ -317,48 +314,6 @@ class _Grid extends StatelessWidget {
             ? null
             : Positioned(bottom: 2, child: MarkerDots(markers: markers)),
       ),
-    );
-  }
-}
-
-class _TimelinePicker extends StatelessWidget {
-  const _TimelinePicker({
-    required this.job,
-    required this.onPick,
-    required this.onClear,
-  });
-
-  final String? job;
-  final VoidCallback onPick;
-  final VoidCallback onClear;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Wrap(
-      spacing: Spacing.sm,
-      runSpacing: Spacing.sm,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        Semantics(
-          header: true,
-          child: Text(
-            CalendarStrings.jobTimeline,
-            style: theme.textTheme.titleMedium,
-          ),
-        ),
-        ActionChip(
-          avatar: const Icon(Icons.work_outline_rounded, size: 18),
-          label: Text('${job ?? CalendarStrings.pickJob} ▾'),
-          onPressed: onPick,
-        ),
-        if (job != null)
-          IconButton(
-            tooltip: CalendarStrings.clearTimeline,
-            icon: const Icon(Icons.close_rounded),
-            onPressed: onClear,
-          ),
-      ],
     );
   }
 }

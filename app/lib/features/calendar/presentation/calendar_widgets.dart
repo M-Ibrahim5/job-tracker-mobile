@@ -4,7 +4,9 @@ import 'package:intl/intl.dart';
 import '../../../app/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/dashboard_strings.dart';
+import '../../../core/widgets/widgets.dart';
 import '../../../domain/enums/enums.dart';
+import '../../../domain/models/job_application.dart';
 import '../application/calendar_logic.dart';
 
 /// Dot color of [marker] for the current theme.
@@ -186,6 +188,305 @@ class CalendarLegend extends StatelessWidget {
           CalendarStrings.legendFollowUp,
         ),
       ],
+    );
+  }
+}
+
+/// "Today" pill with a small calendar page showing today's month and day.
+class TodayButton extends StatelessWidget {
+  /// Creates the button.
+  const TodayButton({required this.today, required this.onPressed, super.key});
+
+  final DateTime today;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Tooltip(
+      message: CalendarStrings.todayTooltip(
+        DateFormat.yMMMMEEEEd().format(today),
+      ),
+      child: Material(
+        color: scheme.secondaryContainer,
+        shape: const StadiumBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onPressed,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: Sizes.minTouch),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(6, 6, 16, 6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _CalendarPage(date: today),
+                  const SizedBox(width: Spacing.sm),
+                  Text(
+                    CalendarStrings.today,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: scheme.onSecondaryContainer,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Tiny tear-off calendar page: coloured month band over the day number.
+class _CalendarPage extends StatelessWidget {
+  const _CalendarPage({required this.date});
+
+  final DateTime date;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return ExcludeSemantics(
+      child: Container(
+        key: const ValueKey('today-page'),
+        width: 30,
+        height: 32,
+        decoration: BoxDecoration(
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: scheme.shadow.withValues(alpha: 0.18),
+              blurRadius: 3,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          children: [
+            Container(
+              height: 11,
+              width: double.infinity,
+              color: scheme.primary,
+              alignment: Alignment.center,
+              child: Text(
+                DateFormat.MMM().format(date).toUpperCase(),
+                style: TextStyle(
+                  fontSize: 7.5,
+                  height: 1,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.4,
+                  color: scheme.onPrimary,
+                ),
+              ),
+            ),
+            Expanded(
+              child: Center(
+                child: Text(
+                  '${date.day}',
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1,
+                    fontWeight: FontWeight.w800,
+                    color: scheme.onSurface,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Picks the application whose journey is shown on the calendar: a dashed
+/// "Choose a job" card when none is picked, otherwise a card with the
+/// company, role and status, plus change and clear actions.
+class JobTimelinePicker extends StatelessWidget {
+  /// Creates the picker.
+  const JobTimelinePicker({
+    required this.job,
+    required this.onPick,
+    required this.onClear,
+    super.key,
+  });
+
+  final JobApplication? job;
+  final VoidCallback onPick;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(
+          header: true,
+          child: Text(
+            CalendarStrings.jobTimeline,
+            style: theme.textTheme.titleMedium,
+          ),
+        ),
+        const SizedBox(height: Spacing.sm),
+        if (job == null)
+          _EmptyJobCard(onPick: onPick)
+        else
+          _SelectedJobCard(job: job!, onPick: onPick, onClear: onClear),
+      ],
+    );
+  }
+}
+
+class _EmptyJobCard extends StatelessWidget {
+  const _EmptyJobCard({required this.onPick});
+
+  final VoidCallback onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return DashedBorder(
+      color: scheme.outline,
+      radius: Radii.card,
+      strokeWidth: 1.5,
+      child: Material(
+        color: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(Radii.card),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          key: const ValueKey('job-picker-empty'),
+          onTap: onPick,
+          child: Padding(
+            padding: const EdgeInsets.all(Spacing.md),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: scheme.primaryContainer,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.add_rounded,
+                    color: scheme.onPrimaryContainer,
+                  ),
+                ),
+                const SizedBox(width: Spacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        CalendarStrings.pickJob,
+                        style: theme.textTheme.titleSmall,
+                      ),
+                      Text(
+                        CalendarStrings.pickJobHint,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SelectedJobCard extends StatelessWidget {
+  const _SelectedJobCard({
+    required this.job,
+    required this.onPick,
+    required this.onClear,
+  });
+
+  final JobApplication job;
+  final VoidCallback onPick;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Material(
+      color: scheme.surfaceContainerHigh,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(Radii.card),
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        key: const ValueKey('job-picker-selected'),
+        onTap: onPick,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            Spacing.md,
+            Spacing.sm,
+            Spacing.xs,
+            Spacing.sm,
+          ),
+          child: Row(
+            children: [
+              CompanyMonogram(
+                companyName: job.companyName,
+                status: job.status,
+                size: 40,
+              ),
+              const SizedBox(width: Spacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      job.companyName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      job.jobTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: Spacing.xs),
+                    StatusChip(status: job.status),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: CalendarStrings.changeJob,
+                icon: const Icon(Icons.swap_horiz_rounded),
+                onPressed: onPick,
+              ),
+              IconButton(
+                tooltip: CalendarStrings.clearTimeline,
+                icon: const Icon(Icons.close_rounded),
+                onPressed: onClear,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

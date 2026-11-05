@@ -31,6 +31,8 @@ import 'package:jobtrail/features/calendar/presentation/calendar_widgets.dart';
 import 'package:jobtrail/domain/enums/enums.dart';
 
 import '../helpers/test_app.dart';
+import 'package:jobtrail/features/calendar/application/calendar_logic.dart';
+import 'package:table_calendar/table_calendar.dart';
 
 const _realBackend = bool.fromEnvironment('REAL_BACKEND');
 
@@ -184,7 +186,13 @@ void main() {
         findsWidgets,
         reason: 'interview dot',
       );
-      await _tap(tester, day());
+      // Not _tap: ensureVisible on a day cell also scrolls the calendar's
+      // horizontal page view, and a cell past the middle (Thursday to
+      // Sunday) snaps it to the next month.
+      await tester.ensureVisible(find.byType(TableCalendar<DayMarker>));
+      await _settle(tester);
+      await tester.tap(day());
+      await _settle(tester);
       await tester.scrollUntilVisible(
         find.text('Technical round'),
         200,

@@ -143,10 +143,10 @@ Order top to bottom (scrollable, pull-to-refresh, skeletons while loading):
 - Footer Cancel/Save. Back with unsaved changes → confirm dialog.
 
 ### 4.7 Calendar [`/calendar`] (nav)
-- H1 + "Today" button. Format segmented: **Month | 2 weeks | Week** (remember last choice locally).
+- H1 + **Today** button: tonal stadium pill (`secondaryContainer`, min 48 high) with a tiny tear-off calendar page (30×32, white, radius 8, primary month band "NOV" over the day number) and the label "Today"; tooltip "Jump to today, {full date}". Format segmented: **Month | 2 weeks | Week** (remember last choice locally).
 - `table_calendar`, week starts Monday. Month header with chevrons. Today = 2px primary ring; selected = primary fill. Dots under day numbers (max 3): applied (blue 6), status change (status accent 6), interview (purple **8**, emphasized), follow-up (teal 6). Legend row below grid.
 - **Day events**: tapping any date opens a bottom sheet with that day's events and the Add interview / Add job application buttons. See [features/FEATURE-CALENDAR-DAY.md](features/FEATURE-CALENDAR-DAY.md). There is no inline day agenda; the Job timeline section stays.
-- **Job timeline mode**: picker "Company ▾" to select an application; shows vertical list Applied → Screening → Interview → upcoming rounds with dates; those dates are highlighted on the calendar.
+- **Job timeline mode**: a full-width picker card. With nothing picked it is dashed (outline colour, radius 18) with a 40 dp "+" circle, "Choose a job" and the hint "Highlight one application's dates on the calendar". With a job picked it is a filled card (`surfaceContainerHigh`) with a company monogram (first letter tinted by status), company (bold), job title, the status chip, a "Change job" swap button and a clear (×) button. Picking an application shows vertical list Applied → Screening → Interview → upcoming rounds with dates; those dates are highlighted on the calendar.
 - Extended FAB "Interview" → add interview with date prefilled to selected day.
 
 ### 4.8 Add / edit interview [`/applications/:id/interviews/new`, `/interviews/new?date=`, `/interviews/:id/edit`] (no nav)

@@ -61,7 +61,11 @@ abstract final class CalendarStrings {
   static const fab = 'Interview';
   static const loadFailed = "Couldn't load events.";
   static const jobTimeline = 'Job timeline';
-  static const pickJob = 'Company';
+  static const pickJob = 'Choose a job';
+  static const pickJobHint =
+      "Highlight one application's dates on the calendar";
+  static const changeJob = 'Change job';
+  static String todayTooltip(String date) => 'Jump to today, $date';
   static const pickJobTitle = 'Choose an application';
   static const searchJobs = 'Search';
   static const noJobs = 'No applications found';
