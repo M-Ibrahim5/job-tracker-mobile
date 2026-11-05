@@ -7,12 +7,51 @@ import '../../../app/routes.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/dashboard_strings.dart';
 import '../../../core/widgets/widgets.dart';
+import '../../../domain/enums/enums.dart';
 import '../../interviews/presentation/interview_tile.dart';
 import '../application/chart_logic.dart';
 import '../application/dashboard_providers.dart';
 import '../application/dashboard_view_model.dart';
+import 'chart_sheets.dart';
 import 'dashboard_charts.dart';
 import 'dashboard_widgets.dart';
+
+/// Opens the pipeline pop-up for [status], then whatever was chosen in it:
+/// an application (pushed, so Back returns here) or the filtered list.
+Future<void> openStatusSheet(
+  BuildContext context,
+  ApplicationStatus status,
+) async {
+  final action = await showStatusApplicationsSheet(context, status);
+  if (!context.mounted) return;
+  _follow(context, action, applicationsUriForStatus(status));
+}
+
+/// Opens the weekly pop-up for the week starting [monday].
+Future<void> openWeekSheet(
+  BuildContext context,
+  DateTime monday, {
+  required bool isCurrent,
+}) async {
+  final action = await showWeekApplicationsSheet(
+    context,
+    monday: monday,
+    isCurrent: isCurrent,
+  );
+  if (!context.mounted) return;
+  _follow(context, action, applicationsUriForWeek(monday));
+}
+
+void _follow(BuildContext context, DrillAction? action, Uri fullList) {
+  switch (action) {
+    case OpenApplicationAction(:final id):
+      context.push(Routes.applicationDetail(id));
+    case OpenFullListAction():
+      context.go(fullList.toString());
+    case null:
+      break;
+  }
+}
 
 /// Home tab (`/`).
 class DashboardScreen extends ConsumerWidget {
@@ -187,15 +226,17 @@ class _Content extends StatelessWidget {
         PipelineCard(
           vm: vm,
           onAdd: () => context.push(Routes.newApplication),
-          onOpenStatus: (s) =>
-              context.go(applicationsUriForStatus(s).toString()),
+          onOpenStatus: (s) => openStatusSheet(context, s),
         ),
         gap,
         WeeklyBarsCard(
           vm: vm,
           onAdd: () => context.push(Routes.newApplication),
-          onOpenWeek: (monday) =>
-              context.go(applicationsUriForWeek(monday).toString()),
+          onOpenWeek: (monday) => openWeekSheet(
+            context,
+            monday,
+            isCurrent: vm.bars.any((b) => b.isCurrent && b.weekStart == monday),
+          ),
         ),
         gap,
         DashSectionTitle(

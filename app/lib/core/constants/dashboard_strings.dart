@@ -41,6 +41,28 @@ abstract final class DashboardStrings {
   static String shareOfTotal(int percent, int total) => '$percent% of $total';
   static const movedPrefix = 'Moved ';
   static const movedMiddle = ' to ';
+
+  // Chart pop-ups (CHARTS.md §1.5, §2.4).
+  static String applicationCount(int n) =>
+      n == 1 ? '1 application' : '$n applications';
+  static const thisWeekTitle = 'This week';
+  static String weekOfTitle(String day) => 'Week of $day';
+  static String weekSubtitle(int n, String range) =>
+      '${applicationCount(n)} · $range';
+  static String noStatusApplications(String status) =>
+      'No $status applications yet';
+  static const openInApplications = 'Open in Applications';
+  static String showingOf(int shown, int total) => 'Showing $shown of $total';
+  static const drillLoadFailed = "Couldn't load these applications.";
+  static const whereTheyAreNow = 'Where they are now';
+  static const sheetClose = 'Close';
+  static String drillRowSemantics(
+    String title,
+    String company,
+    String status,
+  ) => '$title at $company, $status. Opens the application';
+  static String statusSheetLabel(String status) => '$status applications';
+  static String weekSheetLabel(String range) => 'Applications sent $range';
 }
 
 /// User-facing strings of the calendar.

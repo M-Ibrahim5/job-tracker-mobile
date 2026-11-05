@@ -15,6 +15,7 @@ import 'package:jobtrail/domain/enums/enums.dart';
 import 'package:jobtrail/domain/models/dashboard_data.dart';
 import 'package:jobtrail/domain/repositories/misc_repositories.dart';
 import 'package:jobtrail/features/dashboard/application/dashboard_providers.dart';
+import 'package:jobtrail/features/dashboard/presentation/chart_sheets.dart';
 import 'package:jobtrail/features/dashboard/presentation/dashboard_charts.dart';
 import 'package:jobtrail/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:jobtrail/features/dashboard/presentation/dashboard_widgets.dart';
@@ -292,7 +293,12 @@ void main() {
           (st) => s.backend.applications.values.any((a) => a.status == st),
         );
 
-    testWidgets('every legend row opens its status, zero counts included', (
+    Future<void> openFullList(WidgetTester tester) async {
+      await tester.tap(find.text(DashboardStrings.openInApplications));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('every legend row opens its pop-up, zero counts included', (
       tester,
     ) async {
       final s = _Setup();
@@ -317,6 +323,11 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(row);
         await tester.pumpAndSettle();
+        final sheet = find.byType(StatusApplicationsSheet);
+        expect(sheet, findsOneWidget, reason: status.name);
+        expect(tester.widget<StatusApplicationsSheet>(sheet).status, status);
+        // The full filtered list is still one tap away.
+        await openFullList(tester);
         expect(find.text('LIST status=${status.name}'), findsOneWidget);
         GoRouter.of(tester.element(find.textContaining('LIST'))).go('/');
         await tester.pumpAndSettle();
@@ -324,14 +335,76 @@ void main() {
       }
     });
 
-    testWidgets('tapping a ring segment opens that status', (tester) async {
+    testWidgets('tapping a segment lists that status in a pop-up', (
+      tester,
+    ) async {
       final s = await _pump(tester);
       await _scrollTo(tester, find.byType(PieChart));
+      final status = firstUsed(s);
+      final expected = s.backend.applications.values
+          .where((a) => a.status == status)
+          .toList();
 
       final center = tester.getCenter(find.byType(PieChart));
       await tester.tapAt(center + const Offset(3, -80));
       await tester.pumpAndSettle();
-      expect(find.text('LIST status=${firstUsed(s).name}'), findsOneWidget);
+
+      expect(find.textContaining('LIST'), findsNothing, reason: 'no jump');
+      final sheet = find.byType(StatusApplicationsSheet);
+      expect(sheet, findsOneWidget);
+      expect(
+        find.descendant(of: sheet, matching: find.byType(DrillApplicationRow)),
+        findsNWidgets(expected.length),
+      );
+      expect(
+        find.text(DashboardStrings.applicationCount(expected.length)),
+        findsOneWidget,
+      );
+      // Each row shows title, company and status.
+      final a = expected.first;
+      final row = find.ancestor(
+        of: find.text(a.jobTitle),
+        matching: find.byType(DrillApplicationRow),
+      );
+      expect(
+        find.descendant(of: row, matching: find.text(a.companyName)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: row, matching: find.byType(StatusChip)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('a row in the pop-up opens its application', (tester) async {
+      final s = await _pump(tester);
+      await _scrollTo(tester, find.byType(PieChart));
+      final a = s.backend.applications.values.firstWhere(
+        (x) => x.status == firstUsed(s),
+      );
+      await tester.tapAt(
+        tester.getCenter(find.byType(PieChart)) + const Offset(3, -80),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text(a.jobTitle).first);
+      await tester.pumpAndSettle();
+      expect(find.byType(StatusApplicationsSheet), findsNothing);
+      expect(find.text('DETAIL-${a.id}'), findsOneWidget);
+    });
+
+    testWidgets('closing the pop-up stays on the dashboard', (tester) async {
+      await _pump(tester);
+      await _scrollTo(tester, find.byType(PieChart));
+      await tester.tapAt(
+        tester.getCenter(find.byType(PieChart)) + const Offset(3, -80),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip(DashboardStrings.sheetClose));
+      await tester.pumpAndSettle();
+      expect(find.byType(StatusApplicationsSheet), findsNothing);
+      expect(find.byType(PipelineCard), findsOneWidget);
+      expect(find.textContaining('LIST'), findsNothing);
     });
 
     testWidgets('tapping the hole does nothing', (tester) async {
@@ -384,7 +457,9 @@ void main() {
       expect(find.textContaining('LIST'), findsNothing);
     });
 
-    testWidgets('a bar with applications opens its week', (tester) async {
+    testWidgets('a bar with applications opens its week pop-up', (
+      tester,
+    ) async {
       final s = _Setup();
       useWeekly(s);
       await _pump(tester, setup: s);
@@ -395,6 +470,11 @@ void main() {
       // Any height inside the column counts, not just the bar itself.
       await tester.tapAt(Offset(rect.left + column * 4.5, rect.top + 6));
       await tester.pumpAndSettle();
+      final sheet = find.byType(WeekApplicationsSheet);
+      expect(sheet, findsOneWidget);
+      expect(tester.widget<WeekApplicationsSheet>(sheet).isCurrent, isFalse);
+      expect(find.text('Week of 28 Sep'), findsOneWidget);
+      await openFullList(tester);
       expect(find.text('LIST from=2026-09-28&to=2026-10-04'), findsOneWidget);
     });
 
@@ -411,6 +491,16 @@ void main() {
         Offset(rect.left + rect.width / 8 * 7.5, rect.bottom - 10),
       );
       await tester.pumpAndSettle();
+      final sheet = find.byType(WeekApplicationsSheet);
+      expect(tester.widget<WeekApplicationsSheet>(sheet).isCurrent, isTrue);
+      expect(
+        find.descendant(
+          of: sheet,
+          matching: find.text(DashboardStrings.thisWeekTitle),
+        ),
+        findsOneWidget,
+      );
+      await openFullList(tester);
       expect(find.text('LIST from=2026-10-19&to=2026-10-25'), findsOneWidget);
     });
 
