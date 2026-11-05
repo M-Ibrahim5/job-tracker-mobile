@@ -833,7 +833,10 @@ class DetailRow extends StatelessWidget {
       constraints: const BoxConstraints(minHeight: Sizes.minTouch),
       child: Row(
         children: [
-          Flexible(
+          // Both columns are Expanded: with a loose label the leftover space
+          // ended up after the value, so each value's right edge moved with
+          // its label's length.
+          Expanded(
             flex: 2,
             child: Text(
               label,

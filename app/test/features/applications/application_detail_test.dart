@@ -127,6 +127,34 @@ void main() {
     });
   });
 
+  group('details card', () {
+    testWidgets('every value ends at the same x, whatever the label length', (
+      tester,
+    ) async {
+      await _pumpDetail(tester, 1);
+      await _scrollTo(tester, find.text(ApplicationStrings.detailAppliedOn));
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, -150));
+      await tester.pumpAndSettle();
+
+      final rows = tester.widgetList<DetailRow>(find.byType(DetailRow));
+      expect(rows, hasLength(4));
+      final rights = [
+        for (final r in rows)
+          tester
+              .getRect(
+                find.descendant(
+                  of: find.byWidget(r),
+                  matching: find.text(r.value),
+                ),
+              )
+              .right,
+      ];
+      for (final right in rights) {
+        expect(right, moreOrLessEquals(rights.first, epsilon: 0.5));
+      }
+    });
+  });
+
   group('content', () {
     testWidgets('shows header, details, notes and the status timeline', (
       tester,
