@@ -62,6 +62,8 @@ jobtrail:
     auth-limit: ${AUTH_RATE_LIMIT:10}
     token-limit: ${TOKEN_RATE_LIMIT:120}
     trust-forwarded-for: ${TRUST_FORWARDED_FOR:false}
+    # Proxies in front of the gateway (comma-separated IPs); only they may set X-Forwarded-For.
+    trusted-proxies: ${TRUSTED_PROXIES:127.0.0.1,::1}
     # e.g. redis://:password@redis-host:6379/0 — shares rate limits between gateway instances.
     # Empty: counted in this process only.
     redis-url: ${REDIS_URL:}

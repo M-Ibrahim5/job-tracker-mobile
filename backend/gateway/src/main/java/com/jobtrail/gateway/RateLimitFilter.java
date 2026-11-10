@@ -1,6 +1,8 @@
 package com.jobtrail.gateway;
 
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.util.Set;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
@@ -19,6 +21,8 @@ import reactor.core.publisher.Mono;
 @Component
 public class RateLimitFilter implements GlobalFilter, Ordered {
 
+  /** The longest text form of an IPv6 address. */
+  private static final int MAX_ADDRESS_CHARS = 45;
   private static final String API = "/api/v1/";
   private static final String AUTH = API + "auth/";
   private static final String HEALTH = "/api/v1/health";
@@ -68,14 +72,57 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
   }
 
   private String clientAddress(ServerWebExchange exchange) {
-    if (props.trustForwardedFor()) {
-      String forwarded = exchange.getRequest().getHeaders().getFirst("X-Forwarded-For");
-      if (forwarded != null && !forwarded.isBlank()) {
-        return forwarded.split(",")[0].trim();
+    InetSocketAddress remote = exchange.getRequest().getRemoteAddress();
+    InetAddress peer = remote == null ? null : remote.getAddress();
+    String peerText = peer == null ? "unknown" : peer.getHostAddress();
+    if (!props.trustForwardedFor() || peer == null || !isTrustedProxy(peer.getHostAddress())) {
+      return peerText;
+    }
+    String forwarded = exchange.getRequest().getHeaders().getFirst("X-Forwarded-For");
+    if (forwarded == null || forwarded.isBlank()) {
+      return peerText;
+    }
+    // Each proxy appends the address it saw, so only entries from the right are trustworthy:
+    // walk left past our own proxies; the first other address is the client.
+    String[] entries = forwarded.split(",");
+    for (int i = entries.length - 1; i >= 0; i--) {
+      String entry = entries[i].trim();
+      if (entry.isEmpty() || entry.length() > MAX_ADDRESS_CHARS) {
+        return peerText;
+      }
+      if (!isTrustedProxy(entry)) {
+        return entry;
       }
     }
-    InetSocketAddress remote = exchange.getRequest().getRemoteAddress();
-    return remote == null || remote.getAddress() == null ? "unknown" : remote.getAddress().getHostAddress();
+    return peerText;
+  }
+
+  /** Compares as addresses, so {@code ::1} and {@code 0:0:0:0:0:0:0:1} are the same proxy. */
+  private boolean isTrustedProxy(String address) {
+    InetAddress candidate = literal(address);
+    if (candidate == null) {
+      return false;
+    }
+    for (String trusted : props.trustedProxies()) {
+      if (candidate.equals(literal(trusted.trim()))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** Parses an IP literal without any DNS lookup; null when [text] is not one. */
+  private static InetAddress literal(String text) {
+    boolean ipv4 = text.matches("[0-9]{1,3}(\\.[0-9]{1,3}){3}");
+    boolean ipv6 = text.indexOf(':') >= 0 && text.matches("[0-9a-fA-F:.]+");
+    if (!ipv4 && !ipv6) {
+      return null;
+    }
+    try {
+      return InetAddress.getByName(text);
+    } catch (UnknownHostException e) {
+      return null;
+    }
   }
 
   @Override

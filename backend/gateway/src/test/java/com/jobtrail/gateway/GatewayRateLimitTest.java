@@ -115,4 +115,26 @@ class GatewayRateLimitTest {
     // Static avatar files are not part of the API budget.
     call("10.0.1.1", "/uploads/avatars/1-abc.png").expectStatus().isOk();
   }
+
+  @Test
+  void aClientCannotChooseItsAddressByWritingTheLeftOfForwardedFor() {
+    // A proxy appends the address it saw (10.0.0.9); everything to the left is client-written.
+    for (int i = 1; i <= 3; i++) {
+      call("203.0.113." + i + ", 10.0.0.9", "/api/v1/auth/login").expectStatus().isOk();
+    }
+    // All four requests came from the same real client, so the auth budget (3) is used up.
+    call("203.0.113.4, 10.0.0.9", "/api/v1/auth/login").expectStatus().isEqualTo(429);
+    // A different client behind the same proxy has its own budget.
+    call("203.0.113.1, 10.0.0.10", "/api/v1/auth/login").expectStatus().isOk();
+  }
+
+  @Test
+  void trustedProxyAddressesAtTheRightAreSkipped() {
+    // Another trusted hop (127.0.0.1 is in the default trusted list) sits right of the client.
+    for (int i = 0; i < 3; i++) {
+      call("10.0.5.1, 127.0.0.1", "/api/v1/auth/login").expectStatus().isOk();
+    }
+    call("10.0.5.1, 127.0.0.1", "/api/v1/auth/login").expectStatus().isEqualTo(429);
+    call("10.0.5.2, 127.0.0.1", "/api/v1/auth/login").expectStatus().isOk();
+  }
 }
