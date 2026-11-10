@@ -90,6 +90,7 @@ class InterviewListNotifier
 
   @override
   Future<InterviewListState> build(InterviewScope arg) async {
+    ref.watch(currentUserIdProvider);
     ref.watch(dataRevisionProvider);
     ref.watch(interviewsRevisionProvider);
     final generation = ++_generation;

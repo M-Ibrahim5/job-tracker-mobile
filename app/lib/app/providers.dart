@@ -179,6 +179,12 @@ final currentUserProvider = Provider<User?>((ref) {
   return auth is AuthAuthenticated ? auth.user : null;
 });
 
+/// Id of the signed-in user, or null. Caches of per-user data watch this so
+/// they start over when another account signs in on the same running app.
+final currentUserIdProvider = Provider<int?>(
+  (ref) => ref.watch(currentUserProvider.select((user) => user?.id)),
+);
+
 /// Cancels local reminders on logout.
 final reminderCancellerProvider = Provider<ReminderCanceller>(
   (ref) => ref.watch(reminderSchedulerProvider),

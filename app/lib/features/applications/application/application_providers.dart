@@ -12,9 +12,10 @@ import '../../settings/application/settings_controller.dart';
 const int kApplicationPageSize = 20;
 
 /// Search / filter / sort criteria currently applied to the list.
-final applicationFilterProvider = StateProvider<ApplicationFilter>(
-  (ref) => const ApplicationFilter(),
-);
+final applicationFilterProvider = StateProvider<ApplicationFilter>((ref) {
+  ref.watch(currentUserIdProvider);
+  return const ApplicationFilter();
+});
 
 /// How long the list waits after the search text changes before querying.
 final searchDebounceProvider = Provider<Duration>(
@@ -94,6 +95,7 @@ class ApplicationListNotifier extends AsyncNotifier<ApplicationListState> {
 
   @override
   Future<ApplicationListState> build() async {
+    ref.watch(currentUserIdProvider);
     ref.watch(dataRevisionProvider);
     final filter = ref.watch(applicationFilterProvider);
     final generation = ++_generation;

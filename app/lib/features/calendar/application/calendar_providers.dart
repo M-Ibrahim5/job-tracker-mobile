@@ -105,6 +105,7 @@ class CalendarEventsNotifier extends Notifier<CalendarEventsState> {
 
   @override
   CalendarEventsState build() {
+    ref.watch(currentUserIdProvider);
     ref.watch(dataRevisionProvider);
     ref.watch(applicationsRevisionProvider);
     ref.watch(interviewsRevisionProvider);
@@ -181,9 +182,10 @@ final calendarDayProvider = Provider.autoDispose
     });
 
 /// Application whose job timeline is shown, or null for the normal calendar.
-final timelineApplicationProvider = StateProvider<JobApplication?>(
-  (ref) => null,
-);
+final timelineApplicationProvider = StateProvider<JobApplication?>((ref) {
+  ref.watch(currentUserIdProvider);
+  return null;
+});
 
 /// Status history and interviews of one application.
 final applicationTimelineProvider = FutureProvider.autoDispose
