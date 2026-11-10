@@ -18,7 +18,7 @@ abstract interface class TokenStorage {
 class SecureTokenStorage implements TokenStorage {
   /// Creates storage; pass [storage] to override the plugin in tests.
   SecureTokenStorage([FlutterSecureStorage? storage])
-    : _storage = storage ?? const FlutterSecureStorage();
+    : _storage = storage ?? _defaultStorage;
 
   static const _accessKey = 'access_token';
   static const _refreshKey = 'refresh_token';
@@ -62,3 +62,10 @@ class MemoryTokenStorage implements TokenStorage {
   @override
   Future<void> clear() async => _tokens = null;
 }
+
+/// Keychain items stay on this device: no iCloud or backup restore to another phone.
+const _defaultStorage = FlutterSecureStorage(
+  iOptions: IOSOptions(
+    accessibility: KeychainAccessibility.first_unlock_this_device,
+  ),
+);

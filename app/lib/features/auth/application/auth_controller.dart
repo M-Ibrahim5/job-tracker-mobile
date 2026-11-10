@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
@@ -106,17 +108,26 @@ class AuthController extends AsyncNotifier<AuthState> {
   /// Revokes the session, cancels local reminders and moves to [AuthUnauthenticated].
   Future<void> signOut() async {
     await ref.read(authRepositoryProvider).signOut();
+    await _clearLocalTraces();
+    state = const AsyncData(AuthUnauthenticated());
+  }
+
+  /// Removes what the session left on the device: scheduled reminders (they
+  /// name companies and interviews) and exported files.
+  Future<void> _clearLocalTraces() async {
     try {
       await ref.read(reminderCancellerProvider).cancelAll();
     } on Object catch (e) {
       ref.read(loggerProvider).w('Could not cancel reminders: $e');
     }
-    state = const AsyncData(AuthUnauthenticated());
+    // Not awaited: removing temp files must never delay signing out.
+    unawaited(ref.read(fileSharerProvider).deleteExports());
   }
 
   /// Called by the network layer after the stored session was rejected and
   /// its credentials were already cleared.
   void sessionExpired() {
+    unawaited(_clearLocalTraces());
     state = const AsyncData(AuthUnauthenticated());
   }
 

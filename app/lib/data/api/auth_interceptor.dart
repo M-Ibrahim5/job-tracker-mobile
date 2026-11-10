@@ -70,7 +70,9 @@ class AuthInterceptor extends Interceptor {
 
     final code = apiErrorCode(err.response?.data);
     if (code != ApiCodes.tokenExpired || request.extra[_retriedKey] == true) {
-      await _expireSession();
+      // A late answer to a request sent with another account's token says
+      // nothing about the session stored now.
+      if (await _sentWithCurrentToken(request)) await _expireSession();
       return handler.next(err);
     }
 
@@ -104,6 +106,13 @@ class AuthInterceptor extends Interceptor {
     } on DioException catch (e) {
       handler.next(e);
     }
+  }
+
+  /// Whether [request] carried the stored access token (or nothing is stored).
+  Future<bool> _sentWithCurrentToken(RequestOptions request) async {
+    final stored = await _tokens.read();
+    return stored == null ||
+        request.headers['Authorization'] == 'Bearer ${stored.accessToken}';
   }
 
   Future<AuthTokens?> _refresh() {

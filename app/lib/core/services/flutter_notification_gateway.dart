@@ -142,6 +142,8 @@ class FlutterNotificationGateway implements NotificationGateway {
               ? Importance.high
               : Importance.defaultImportance,
           priority: isInterview ? Priority.high : Priority.defaultPriority,
+          // Company names and interview details stay hidden on a locked screen.
+          visibility: NotificationVisibility.private,
         ),
         iOS: const DarwinNotificationDetails(),
       ),

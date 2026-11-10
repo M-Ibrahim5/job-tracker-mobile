@@ -83,6 +83,33 @@ void main() {
     expect(signedOut, 0);
   });
 
+  test(
+    'a 401 for an earlier account token does not end the new session',
+    () async {
+      final gate = Completer<void>();
+      final adapter = ScriptedAdapter((o) async {
+        await gate.future;
+        return jsonBody(_unauthorized, 401);
+      });
+      final dio = build(adapter);
+
+      // The request leaves with the old account's token ...
+      final pending = _failureOf(() => dio.get<dynamic>('/me'));
+      while (adapter.requests.isEmpty) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      // ... then another account signs in before the answer arrives.
+      await tokens.save(
+        const AuthTokens(accessToken: 'other', refreshToken: 'r9'),
+      );
+      gate.complete();
+      await pending;
+
+      expect(signedOut, 0);
+      expect((await tokens.read())!.accessToken, 'other');
+    },
+  );
+
   test('concurrent expirations share a single refresh call', () async {
     final refreshGate = Completer<void>();
     final adapter = ScriptedAdapter((o) async {

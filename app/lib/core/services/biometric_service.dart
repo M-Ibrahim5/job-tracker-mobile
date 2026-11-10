@@ -66,7 +66,7 @@ abstract interface class DeviceTokenStore {
 class SecureDeviceTokenStore implements DeviceTokenStore {
   /// Creates the store; pass [storage] to override the plugin in tests.
   SecureDeviceTokenStore([FlutterSecureStorage? storage])
-    : _storage = storage ?? const FlutterSecureStorage();
+    : _storage = storage ?? _defaultStorage;
 
   static const _key = 'device_token';
   static const _ownerKey = 'device_token_owner';
@@ -131,3 +131,10 @@ class UnavailableBiometricAuthenticator implements BiometricAuthenticator {
   @override
   Future<bool> authenticate(String reason) async => false;
 }
+
+/// Keychain items stay on this device: no iCloud or backup restore to another phone.
+const _defaultStorage = FlutterSecureStorage(
+  iOptions: IOSOptions(
+    accessibility: KeychainAccessibility.first_unlock_this_device,
+  ),
+);

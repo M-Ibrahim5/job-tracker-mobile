@@ -13,3 +13,12 @@ build/
 # Local run notes (machine-specific paths)
 FE-run.txt
 *.iml
+
+# Keys, certificates and service configs
+*.pem
+*.key
+*.p12
+google-services.json
+GoogleService-Info.plist
+# Editor launch configs may point at local secrets
+.vscode/

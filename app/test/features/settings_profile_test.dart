@@ -74,6 +74,9 @@ class _RecordingSharer implements FileSharer {
     shared.add(fileName);
     byteCount = bytes.length;
   }
+
+  @override
+  Future<void> deleteExports() async {}
 }
 
 class _FixedPicker implements AvatarPicker {

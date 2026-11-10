@@ -290,3 +290,18 @@ On 3 Nov 2026, I listed the exact runtime dependencies with `mvn dependency:list
 - I did not review TLS termination, reverse proxy settings or hosting, because none are in the repo.
 - I did not reverse-engineer the compiled Flutter app or the iOS project settings.
 - The load tests ran on one laptop: first on Windows, then in Linux containers with production-like limits. Real hardware and network latency will differ; the Linux numbers are the better guide.
+
+## Audit of 10 Nov 2026
+
+A second review used Cloudflare's `security-audit` skill (quick profile, source review only) and found six gaps, mostly in the abuse controls added above. All are fixed; the plan and per-task notes are in [SECURITY-AUDIT-PLAN.md](SECURITY-AUDIT-PLAN.md).
+
+| Finding | Fix |
+|---|---|
+| Encoded paths (`/api/v1/%61uth/login`) bypassed the gateway rate limits | `CanonicalPathFilter` answers 404 for encoded, `;`, `\`, `//` and dot-segment paths |
+| The 5-wrong-passwords lock could be beaten by parallel guesses | Attempts are counted under a row lock before hashing |
+| Leftmost `X-Forwarded-For` was trusted | Only from `TRUSTED_PROXIES`, read from the right |
+| Fingerprint login was not tied to the account that enrolled it | The token records its owner; another account's sign-in forgets it |
+| The next account saw the previous account's cached lists | Per-user caches watch the signed-in user's id |
+| Reminders, calendar and timeline loaded unbounded rows | SQL horizon and row caps, no wide columns |
+
+Open: binding the fingerprint token to the enrolled biometrics (needs a package or native code), and per-user caps on applications and interviews (an API decision).

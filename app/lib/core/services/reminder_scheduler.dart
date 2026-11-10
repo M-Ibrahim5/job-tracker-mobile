@@ -236,6 +236,9 @@ class LocalReminderScheduler implements ReminderScheduler {
             .where((r) => r.fireAt.isAfter(now))
             .toList()
           ..sort((a, b) => a.fireAt.compareTo(b.fireAt));
+    // The user may have signed out while the list was loading: do not bring
+    // their reminders back after sign-out cancelled them.
+    if (!_isSignedIn()) return;
 
     await _gateway.cancelAll();
     final exact = await _gateway.canScheduleExact();

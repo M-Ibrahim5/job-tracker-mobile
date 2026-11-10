@@ -80,6 +80,20 @@ class _FakeRepo implements ReminderRepository {
   }
 }
 
+/// Signs the user out while the reminder list is being fetched.
+class _SignOutDuringFetchRepo extends _FakeRepo {
+  _SignOutDuringFetchRepo(this.signedIn);
+
+  final List<bool> signedIn;
+
+  @override
+  Future<List<ReminderItem>> upcoming() async {
+    final result = await super.upcoming();
+    signedIn[0] = false;
+    return result;
+  }
+}
+
 final _now = DateTime.utc(2026, 10, 25, 4);
 
 ReminderItem _item(
@@ -232,6 +246,26 @@ void main() {
       await off.scheduler.resync();
       expect(off.repo.calls, 0);
       expect(off.gateway.scheduled, isEmpty);
+    });
+
+    test('a sign-out during the fetch does not bring reminders back', () async {
+      final signedIn = [true];
+      final gateway = _FakeGateway();
+      final repo = _SignOutDuringFetchRepo(signedIn)
+        ..items = [
+          _item('interview:1:60', const Duration(hours: 1), interviewId: 1),
+        ];
+      final scheduler = LocalReminderScheduler(
+        gateway: gateway,
+        repository: repo,
+        isSignedIn: () => signedIn[0],
+        onOpenPayload: (_) {},
+        clock: () => _now,
+      );
+
+      await scheduler.resync();
+
+      expect(gateway.scheduled, isEmpty);
     });
 
     test('a failing request keeps the current schedule', () async {
