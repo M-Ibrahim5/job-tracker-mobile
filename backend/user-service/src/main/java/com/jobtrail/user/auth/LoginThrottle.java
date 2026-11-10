@@ -5,10 +5,10 @@ import com.jobtrail.common.error.AppException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Locale;
-import java.util.Optional;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Per-account backoff for password checks ({@code login_throttle}). After {@link #FREE_FAILURES}
@@ -27,54 +27,73 @@ public class LoginThrottle {
   static final Duration FIRST_LOCK = Duration.ofMinutes(1);
   static final Duration MAX_LOCK = Duration.ofMinutes(15);
 
-  private record State(int failures, Instant lockedUntil) {}
+  private record State(int failures, Instant windowStartedAt, Instant lockedUntil) {}
 
   private final JdbcClient jdbc;
+  private final TransactionTemplate tx;
 
-  public LoginThrottle(JdbcClient jdbc) {
+  public LoginThrottle(JdbcClient jdbc, TransactionTemplate tx) {
     this.jdbc = jdbc;
+    this.tx = tx;
   }
 
   private static String key(String email) {
     return email.trim().toLowerCase(Locale.ROOT);
   }
 
-  private Optional<State> state(String email) {
-    return jdbc.sql("SELECT failures, locked_until FROM login_throttle WHERE email = :email")
-        .param("email", key(email))
-        .query((rs, i) -> new State(rs.getInt("failures"), Db.instant(rs, "locked_until")))
-        .optional();
-  }
-
-  /** Throws 429 {@code RATE_LIMITED} while [email] is locked. */
-  public void check(String email, Instant now) {
-    state(email).map(State::lockedUntil).filter(until -> until.isAfter(now)).ifPresent(until -> {
-      long minutes = Math.max(1, (Duration.between(now, until).toSeconds() + 59) / 60);
-      throw new AppException("RATE_LIMITED", HttpStatus.TOO_MANY_REQUESTS,
-          "Too many failed attempts. Try again in " + minutes + (minutes == 1 ? " minute" : " minutes"));
-    });
-  }
-
-  /** Records a wrong password and locks the account once the free attempts are used up. */
-  public void failed(String email, Instant now) {
+  /**
+   * Counts a password attempt for [email] <em>before</em> its password is hashed, and throws 429
+   * {@code RATE_LIMITED} while the account is locked. Counting first, under a row lock, means a
+   * burst of parallel guesses cannot all pass the check before the first failure is recorded:
+   * the fifth attempt in a window sets the lock, and every later one sees it. A correct password
+   * deletes the record ({@link #succeeded}); a busy server hands the attempt back ({@link #refund}).
+   */
+  public void reserve(String email, Instant now) {
     String key = key(email);
-    // Assignments run left to right: `failures` still sees the old window start.
-    jdbc.sql("""
-            INSERT INTO login_throttle (email, failures, window_started_at) VALUES (:email, 1, :now)
-            ON DUPLICATE KEY UPDATE
-              failures = IF(window_started_at < :windowStart, 1, failures + 1),
-              window_started_at = IF(window_started_at < :windowStart, :now, window_started_at)""")
+    Duration[] remaining = new Duration[1];
+    // Created in its own statement (autocommit), so the row exists before the locking read below.
+    // Doing both in one transaction made concurrent first attempts deadlock on the missing key.
+    jdbc.sql("INSERT IGNORE INTO login_throttle (email, failures, window_started_at) VALUES (:email, 0, :now)")
         .param("email", key)
         .param("now", Db.ts(now))
-        .param("windowStart", Db.ts(now.minus(WINDOW)))
         .update();
-    int failures = state(email).map(State::failures).orElse(0);
-    if (failures >= FREE_FAILURES) {
-      jdbc.sql("UPDATE login_throttle SET locked_until = :until WHERE email = :email")
-          .param("until", Db.ts(now.plus(lockFor(failures))))
+    tx.executeWithoutResult(status -> {
+      State row = jdbc.sql("""
+              SELECT failures, window_started_at, locked_until FROM login_throttle
+              WHERE email = :email FOR UPDATE""")
+          .param("email", key)
+          .query((rs, i) -> new State(rs.getInt("failures"), Db.instant(rs, "window_started_at"),
+              Db.instant(rs, "locked_until")))
+          .single();
+      if (row.lockedUntil() != null && row.lockedUntil().isAfter(now)) {
+        remaining[0] = Duration.between(now, row.lockedUntil());
+        return;
+      }
+      boolean newWindow = row.windowStartedAt().isBefore(now.minus(WINDOW));
+      int failures = newWindow ? 1 : row.failures() + 1;
+      Instant lockedUntil = failures >= FREE_FAILURES ? now.plus(lockFor(failures)) : null;
+      jdbc.sql("""
+              UPDATE login_throttle
+              SET failures = :failures, window_started_at = :windowStart, locked_until = :lockedUntil
+              WHERE email = :email""")
+          .param("failures", failures)
+          .param("windowStart", Db.ts(newWindow ? now : row.windowStartedAt()))
+          .param("lockedUntil", lockedUntil == null ? null : Db.ts(lockedUntil))
           .param("email", key)
           .update();
+    });
+    if (remaining[0] != null) {
+      long minutes = Math.max(1, (remaining[0].toSeconds() + 59) / 60);
+      throw new AppException("RATE_LIMITED", HttpStatus.TOO_MANY_REQUESTS,
+          "Too many failed attempts. Try again in " + minutes + (minutes == 1 ? " minute" : " minutes"));
     }
+  }
+
+  /** Hands back an attempt that was never evaluated (the server was too busy to hash). */
+  public void refund(String email) {
+    jdbc.sql("UPDATE login_throttle SET failures = GREATEST(failures - 1, 0) WHERE email = :email")
+        .param("email", key(email))
+        .update();
   }
 
   /** Clears the record after a correct password. */

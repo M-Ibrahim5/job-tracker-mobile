@@ -62,6 +62,21 @@ public class AuthService {
     return new AppException("INVALID_CREDENTIALS", HttpStatus.UNAUTHORIZED, "Invalid email or password");
   }
 
+  /**
+   * Checks a password whose attempt was already counted by {@link LoginThrottle#reserve}. When the
+   * server is too busy to hash, the attempt is handed back so real users are not locked out by load.
+   */
+  private boolean matchesCounted(String email, String raw, String hash) {
+    try {
+      return matches(raw, hash);
+    } catch (AppException e) {
+      if ("SERVER_BUSY".equals(e.code())) {
+        throttle.refund(email);
+      }
+      throw e;
+    }
+  }
+
   private boolean matches(String raw, String hash) {
     try {
       return encoder.matches(raw, hash);
@@ -105,14 +120,14 @@ public class AuthService {
 
   public AuthResponse login(String email, String password) {
     Instant now = Instant.now();
-    // Checked before hashing, so a locked account costs no CPU.
-    throttle.check(email, now);
+    // The attempt is counted before hashing, so a locked account costs no CPU and parallel
+    // guesses cannot all slip past the lock. Unknown e-mails are throttled too, so the lock does
+    // not reveal which accounts exist.
+    throttle.reserve(email, now);
     Optional<UserRow> user = users.findByEmail(email);
     String hash = user.map(UserRow::passwordHash).orElseGet(this::dummyHash);
-    boolean ok = matches(password, hash);
+    boolean ok = matchesCounted(email, password, hash);
     if (user.isEmpty() || !ok) {
-      // Unknown e-mails are throttled too, so the lock does not reveal which accounts exist.
-      throttle.failed(email, now);
       throw invalidCredentials();
     }
     throttle.succeeded(email);
@@ -211,9 +226,8 @@ public class AuthService {
   public void changePassword(long userId, String currentPassword, String newPassword, String currentRefreshToken) {
     UserRow user = users.findById(userId).orElseThrow(AppException::unauthorized);
     Instant attemptAt = Instant.now();
-    throttle.check(user.email(), attemptAt);
-    if (!matches(currentPassword, user.passwordHash())) {
-      throttle.failed(user.email(), attemptAt);
+    throttle.reserve(user.email(), attemptAt);
+    if (!matchesCounted(user.email(), currentPassword, user.passwordHash())) {
       throw new AppException("INVALID_CREDENTIALS", HttpStatus.UNAUTHORIZED, "Current password is incorrect",
           Map.of("currentPassword", "Current password is incorrect"));
     }
@@ -233,9 +247,8 @@ public class AuthService {
   public void requirePassword(UserRow user, String password) {
     // Same throttle as login: a stolen access token must not allow guessing the password here.
     Instant now = Instant.now();
-    throttle.check(user.email(), now);
-    if (!matches(password, user.passwordHash())) {
-      throttle.failed(user.email(), now);
+    throttle.reserve(user.email(), now);
+    if (!matchesCounted(user.email(), password, user.passwordHash())) {
       throw new AppException("INVALID_CREDENTIALS", HttpStatus.UNAUTHORIZED, "Password is incorrect",
           Map.of("password", "Password is incorrect"));
     }
