@@ -45,6 +45,7 @@ void main() {
   test(
     'enable needs a scan and the right password, and stores a token',
     () async {
+      await container.read(authControllerProvider.future);
       sensor.recognised = false;
       expect(await actions().enable(password: kFakePassword), isFalse);
       expect(await store.read(), isNull);
@@ -67,8 +68,10 @@ void main() {
   );
 
   test('signIn needs a recognised fingerprint', () async {
+    await container.read(authControllerProvider.future);
     await actions().enable(password: kFakePassword);
     backend.currentUser = null;
+    container.invalidate(authControllerProvider);
     await container.read(authControllerProvider.future);
 
     sensor.recognised = false;
@@ -84,7 +87,7 @@ void main() {
   });
 
   test('a token the server rejects is forgotten', () async {
-    await store.save('revoked-token');
+    await store.save('revoked-token', userId: 1);
     await container.read(authControllerProvider.future);
 
     await expectLater(actions().signIn(), throwsA(isA<UnauthorizedFailure>()));
@@ -92,6 +95,7 @@ void main() {
   });
 
   test('disable revokes the token on the server and forgets it', () async {
+    await container.read(authControllerProvider.future);
     await actions().enable(password: kFakePassword);
     final token = (await store.read())!;
     expect(backend.deviceTokens, contains(token));
@@ -102,6 +106,7 @@ void main() {
   });
 
   test('a password change re-enrols the phone with a fresh token', () async {
+    await container.read(authControllerProvider.future);
     await actions().enable(password: kFakePassword);
     final old = (await store.read())!;
     // The server revokes every device token when the password changes.
@@ -113,4 +118,66 @@ void main() {
     expect(fresh, isNot(old));
     expect(backend.deviceTokens, contains(fresh));
   });
+
+  test(
+    'another account signing in does not inherit fingerprint login',
+    () async {
+      final auth = container.read(authControllerProvider.notifier);
+      await container.read(authControllerProvider.future);
+      await actions().enable(password: kFakePassword);
+      expect(await store.read(), isNotNull);
+
+      await auth.signOut();
+      await auth.signUp(
+        fullName: 'Other Person',
+        email: 'other@example.com',
+        password: 'Passw0rd!',
+      );
+
+      // The token belonged to the first account: it is gone, and the fingerprint
+      // button cannot sign in as that account any more.
+      expect(await store.read(), isNull);
+      final status = await container.read(biometricStatusProvider.future);
+      expect(status.enabled, isFalse);
+      expect(await actions().signIn(), isFalse);
+    },
+  );
+
+  test('the owner keeps fingerprint login after a password sign-in', () async {
+    final auth = container.read(authControllerProvider.notifier);
+    await container.read(authControllerProvider.future);
+    await actions().enable(password: kFakePassword);
+
+    await auth.signOut();
+    await auth.signIn(email: kFakeEmail, password: kFakePassword);
+
+    expect(await store.read(), isNotNull);
+    expect(
+      (await container.read(biometricStatusProvider.future)).enabled,
+      isTrue,
+    );
+  });
+
+  test(
+    'a token saved without an owner is claimed by a fingerprint sign-in',
+    () async {
+      final first = await container.read(authControllerProvider.future);
+      expect(first, isA<AuthAuthenticated>());
+      await actions().enable(password: kFakePassword);
+      final token = (await store.read())!;
+      final owner = (await store.readOwner())!;
+      // As saved by an older app version: no owner recorded.
+      store = MemoryDeviceTokenStore(token);
+      container.updateOverrides([
+        useFakeBackendProvider.overrideWithValue(true),
+        fakeBackendProvider.overrideWithValue(backend),
+        biometricAuthenticatorProvider.overrideWithValue(sensor),
+        deviceTokenStoreProvider.overrideWithValue(store),
+      ]);
+      await container.read(authControllerProvider.notifier).signOut();
+
+      expect(await actions().signIn(), isTrue);
+      expect(await store.readOwner(), owner);
+    },
+  );
 }

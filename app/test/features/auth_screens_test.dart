@@ -11,6 +11,7 @@ import 'package:jobtrail/data/fake/fake_repositories.dart';
 import 'package:jobtrail/domain/models/user.dart';
 import 'package:jobtrail/features/auth/application/auth_controller.dart';
 import 'package:jobtrail/features/auth/presentation/login_screen.dart';
+import 'package:jobtrail/core/services/biometric_service.dart';
 import 'package:jobtrail/features/auth/presentation/register_screen.dart';
 
 import '../helpers/test_app.dart';
@@ -40,6 +41,9 @@ Future<ProviderContainer> _pump(
         authRepositoryProvider.overrideWithValue(
           offline ? _OfflineAuthRepository(b) : FakeAuthRepository(b),
         ),
+        // Signing in looks at the saved fingerprint token; secure storage is
+        // not available in widget tests.
+        deviceTokenStoreProvider.overrideWithValue(MemoryDeviceTokenStore()),
       ],
     ),
   );

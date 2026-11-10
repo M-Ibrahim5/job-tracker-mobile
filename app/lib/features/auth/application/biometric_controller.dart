@@ -14,7 +14,8 @@ class BiometricStatus {
   /// The device has a sensor with an enrolled fingerprint / face.
   final bool available;
 
-  /// A device token is saved, so the login screen shows the fingerprint button.
+  /// A device token is saved for the signed-in user (or, on the login screen,
+  /// for whoever enrolled it), so the login screen shows the fingerprint button.
   final bool enabled;
 
   /// Show the "sign in with fingerprint" button.
@@ -25,11 +26,17 @@ class BiometricStatus {
 final biometricStatusProvider = FutureProvider.autoDispose<BiometricStatus>((
   ref,
 ) async {
-  final available = await ref
-      .watch(biometricAuthenticatorProvider)
-      .isAvailable();
-  final saved = await ref.watch(deviceTokenStoreProvider).read();
-  return BiometricStatus(available: available, enabled: saved != null);
+  // Watched before any await, so the status is recomputed when the signed-in
+  // user changes.
+  final user = ref.watch(currentUserProvider);
+  final sensor = ref.watch(biometricAuthenticatorProvider);
+  final store = ref.watch(deviceTokenStoreProvider);
+  final available = await sensor.isAvailable();
+  final saved = await store.read();
+  // Fingerprint login belongs to the account that enrolled it: someone else
+  // signed in must not see it as on.
+  final owned = user == null || await store.readOwner() == user.id;
+  return BiometricStatus(available: available, enabled: saved != null && owned);
 });
 
 /// Turn fingerprint login on / off and sign in with it.
@@ -54,10 +61,12 @@ class BiometricActions {
     if (!await _sensor.authenticate(AccountStrings.biometricEnableReason)) {
       return false;
     }
+    final user = _ref.read(currentUserProvider);
+    if (user == null) return false;
     final token = await _ref
         .read(authRepositoryProvider)
         .createDeviceToken(password: password);
-    await _store.save(token);
+    await _store.save(token, userId: user.id);
     _ref.invalidate(biometricStatusProvider);
     return true;
   }
@@ -106,12 +115,13 @@ class BiometricActions {
   /// A password change revokes every device token on the server; while the
   /// session is still valid, enrol this phone again with the new password.
   Future<void> passwordChanged(String newPassword) async {
-    if (await _store.read() == null) return;
+    final user = _ref.read(currentUserProvider);
+    if (user == null || await _store.read() == null) return;
     try {
       final token = await _ref
           .read(authRepositoryProvider)
           .createDeviceToken(password: newPassword);
-      await _store.save(token);
+      await _store.save(token, userId: user.id);
     } on Failure {
       await forget();
     }

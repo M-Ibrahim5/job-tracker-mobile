@@ -53,6 +53,7 @@ class AuthController extends AsyncNotifier<AuthState> {
     final user = await ref
         .read(authRepositoryProvider)
         .signIn(email: email, password: password);
+    await _forgetForeignDeviceToken(user);
     state = AsyncData(AuthAuthenticated(user));
   }
 
@@ -61,7 +62,32 @@ class AuthController extends AsyncNotifier<AuthState> {
     final user = await ref
         .read(authRepositoryProvider)
         .deviceSignIn(deviceToken);
+    // A token saved before owners were recorded now has a known owner.
+    try {
+      final store = ref.read(deviceTokenStoreProvider);
+      if (await store.readOwner() == null) {
+        await store.save(deviceToken, userId: user.id);
+      }
+    } on Object catch (e) {
+      ref.read(loggerProvider).w('Could not record the token owner: $e');
+    }
     state = AsyncData(AuthAuthenticated(user));
+  }
+
+  /// Fingerprint login signs in as whoever enrolled it. When someone else
+  /// signs in with a password, forget the saved token (the server lets it
+  /// expire) so it cannot be used to get back into the other account.
+  Future<void> _forgetForeignDeviceToken(User user) async {
+    try {
+      final store = ref.read(deviceTokenStoreProvider);
+      if (await store.read() == null) return;
+      if (await store.readOwner() != user.id) {
+        await store.clear();
+      }
+    } on Object catch (e) {
+      // Secure storage trouble must not stop the user from signing in.
+      ref.read(loggerProvider).w('Could not check the fingerprint token: $e');
+    }
   }
 
   /// Registers, signs in and moves to [AuthAuthenticated].
@@ -73,6 +99,7 @@ class AuthController extends AsyncNotifier<AuthState> {
     final user = await ref
         .read(authRepositoryProvider)
         .signUp(fullName: fullName, email: email, password: password);
+    await _forgetForeignDeviceToken(user);
     state = AsyncData(AuthAuthenticated(user));
   }
 

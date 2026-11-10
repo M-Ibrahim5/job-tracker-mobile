@@ -51,10 +51,14 @@ abstract interface class DeviceTokenStore {
   /// The saved token, or null when fingerprint login is off.
   Future<String?> read();
 
-  /// Saves [token], turning fingerprint login on.
-  Future<void> save(String token);
+  /// Id of the user the saved token was issued to, or null when none is
+  /// saved or it was saved without an owner.
+  Future<int?> readOwner();
 
-  /// Forgets the token, turning fingerprint login off.
+  /// Saves [token] for [userId], turning fingerprint login on for that user.
+  Future<void> save(String token, {required int userId});
+
+  /// Forgets the token and its owner, turning fingerprint login off.
   Future<void> clear();
 }
 
@@ -65,6 +69,7 @@ class SecureDeviceTokenStore implements DeviceTokenStore {
     : _storage = storage ?? const FlutterSecureStorage();
 
   static const _key = 'device_token';
+  static const _ownerKey = 'device_token_owner';
 
   final FlutterSecureStorage _storage;
 
@@ -72,27 +77,47 @@ class SecureDeviceTokenStore implements DeviceTokenStore {
   Future<String?> read() => _storage.read(key: _key);
 
   @override
-  Future<void> save(String token) => _storage.write(key: _key, value: token);
+  Future<int?> readOwner() async =>
+      int.tryParse(await _storage.read(key: _ownerKey) ?? '');
 
   @override
-  Future<void> clear() => _storage.delete(key: _key);
+  Future<void> save(String token, {required int userId}) async {
+    await _storage.write(key: _ownerKey, value: '$userId');
+    await _storage.write(key: _key, value: token);
+  }
+
+  @override
+  Future<void> clear() async {
+    await _storage.delete(key: _key);
+    await _storage.delete(key: _ownerKey);
+  }
 }
 
 /// In-memory [DeviceTokenStore] for tests and the fake backend.
 class MemoryDeviceTokenStore implements DeviceTokenStore {
-  /// Creates a store, optionally pre-filled with [_token].
-  MemoryDeviceTokenStore([this._token]);
+  /// Creates a store, optionally pre-filled with [_token] owned by [_owner].
+  MemoryDeviceTokenStore([this._token, this._owner]);
 
   String? _token;
+  int? _owner;
 
   @override
   Future<String?> read() async => _token;
 
   @override
-  Future<void> save(String token) async => _token = token;
+  Future<int?> readOwner() async => _owner;
 
   @override
-  Future<void> clear() async => _token = null;
+  Future<void> save(String token, {required int userId}) async {
+    _token = token;
+    _owner = userId;
+  }
+
+  @override
+  Future<void> clear() async {
+    _token = null;
+    _owner = null;
+  }
 }
 
 /// Authenticator used with the fake backend: no sensor, so the feature is off.
