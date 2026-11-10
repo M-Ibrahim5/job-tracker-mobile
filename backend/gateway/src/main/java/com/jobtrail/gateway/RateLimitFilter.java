@@ -80,6 +80,7 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
 
   @Override
   public int getOrder() {
-    return Ordered.HIGHEST_PRECEDENCE;
+    // One step behind CanonicalPathFilter, so only canonical paths are classified here.
+    return Ordered.HIGHEST_PRECEDENCE + 1;
   }
 }
