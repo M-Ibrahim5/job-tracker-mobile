@@ -38,6 +38,23 @@ public class InterviewRepository {
       SELECT i.*, a.job_title AS application_title, a.company_name AS company_name
       FROM interviews i JOIN job_applications a ON a.id = i.application_id""";
 
+  /**
+   * Like {@link #SELECT} without the wide text columns, for reads that only need to know when an
+   * interview is (reminders, calendar). Those columns come back as null.
+   */
+  private static final String SELECT_LIGHT = """
+      SELECT i.id, i.application_id, i.title, i.type, i.scheduled_at, i.duration_minutes,
+             NULL AS location_or_link, NULL AS interviewer_name, NULL AS notes,
+             i.reminder_offsets, i.outcome, i.created_at, i.updated_at,
+             a.job_title AS application_title, a.company_name AS company_name
+      FROM interviews i JOIN job_applications a ON a.id = i.application_id
+      """;
+
+  /** Most interviews of one application returned by the timeline. */
+  public static final int MAX_PER_APPLICATION = 200;
+  /** Most interviews returned for one calendar range. */
+  public static final int MAX_PER_RANGE = 1000;
+
   private static final RowMapper<InterviewRow> MAPPER = (rs, n) -> new InterviewRow(
       rs.getLong("id"),
       rs.getLong("application_id"),
@@ -110,9 +127,11 @@ public class InterviewRepository {
   }
 
   public List<InterviewRow> forApplication(long userId, long applicationId) {
-    return jdbc.sql(SELECT + " WHERE i.user_id = :user AND i.application_id = :app ORDER BY i.scheduled_at ASC, i.id ASC")
+    return jdbc.sql(SELECT + " WHERE i.user_id = :user AND i.application_id = :app"
+            + " ORDER BY i.scheduled_at ASC, i.id ASC LIMIT :limit")
         .param("user", userId)
         .param("app", applicationId)
+        .param("limit", MAX_PER_APPLICATION)
         .query(MAPPER)
         .list();
   }
@@ -146,21 +165,32 @@ public class InterviewRepository {
         .list();
   }
 
-  /** Pending interviews strictly after {@code now} (the reminder candidates). */
-  public List<InterviewRow> pendingAfter(long userId, Instant now) {
-    return jdbc.sql(SELECT + " WHERE i.user_id = :user AND i.outcome = 'pending' AND i.scheduled_at > :now")
+  /**
+   * Pending interviews with {@code now < scheduled_at <= upTo}, soonest first, at most [limit]: the
+   * reminder candidates. [upTo] is the last moment a reminder can still be wanted, so interviews
+   * further out are never loaded.
+   */
+  public List<InterviewRow> pendingBetween(long userId, Instant now, Instant upTo, int limit) {
+    return jdbc.sql(SELECT_LIGHT + """
+             WHERE i.user_id = :user AND i.outcome = 'pending' AND i.scheduled_at > :now AND i.scheduled_at <= :upTo
+             ORDER BY i.scheduled_at ASC, i.id ASC LIMIT :limit""")
         .param("user", userId)
         .param("now", Db.ts(now))
+        .param("upTo", Db.ts(upTo))
+        .param("limit", limit)
         .query(MAPPER)
         .list();
   }
 
-  /** Every interview with {@code lo <= scheduled_at < hi}. */
+  /** Interviews with {@code lo <= scheduled_at < hi} (without notes and location), at most {@link #MAX_PER_RANGE}. */
   public List<InterviewRow> between(long userId, Instant lo, Instant hi) {
-    return jdbc.sql(SELECT + " WHERE i.user_id = :user AND i.scheduled_at >= :lo AND i.scheduled_at < :hi")
+    return jdbc.sql(SELECT_LIGHT + """
+             WHERE i.user_id = :user AND i.scheduled_at >= :lo AND i.scheduled_at < :hi
+             ORDER BY i.scheduled_at ASC, i.id ASC LIMIT :limit""")
         .param("user", userId)
         .param("lo", Db.ts(lo))
         .param("hi", Db.ts(hi))
+        .param("limit", MAX_PER_RANGE)
         .query(MAPPER)
         .list();
   }

@@ -86,6 +86,9 @@ public class ApplicationRepository {
     return value == null ? null : Enum.valueOf(type, value);
   }
 
+  /** Most applications returned by one calendar or reminder range query. */
+  public static final int MAX_PER_RANGE = 1000;
+
   private final JdbcClient jdbc;
 
   public ApplicationRepository(JdbcClient jdbc) {
@@ -176,7 +179,9 @@ public class ApplicationRepository {
   }
 
   public List<ApplicationRow> appliedBetween(long userId, LocalDate from, LocalDate to) {
-    return jdbc.sql(LIGHT + " WHERE a.user_id = :user AND a.applied_date >= :from AND a.applied_date <= :to")
+    return jdbc.sql(LIGHT + " WHERE a.user_id = :user AND a.applied_date >= :from AND a.applied_date <= :to"
+            + " ORDER BY a.applied_date ASC, a.id ASC LIMIT :limit")
+        .param("limit", MAX_PER_RANGE)
         .param("user", userId)
         .param("from", from)
         .param("to", to)
@@ -187,7 +192,9 @@ public class ApplicationRepository {
 
   /** Applications whose follow-up falls in {@code lo <= follow_up_at < hi}. */
   public List<ApplicationRow> followUpsBetween(long userId, Instant lo, Instant hi) {
-    return jdbc.sql(LIGHT + " WHERE a.user_id = :user AND a.follow_up_at >= :lo AND a.follow_up_at < :hi")
+    return jdbc.sql(LIGHT + " WHERE a.user_id = :user AND a.follow_up_at >= :lo AND a.follow_up_at < :hi"
+            + " ORDER BY a.follow_up_at ASC, a.id ASC LIMIT :limit")
+        .param("limit", MAX_PER_RANGE)
         .param("user", userId)
         .param("lo", Db.ts(lo))
         .param("hi", Db.ts(hi))
@@ -198,7 +205,9 @@ public class ApplicationRepository {
 
   /** Applications with {@code after < follow_up_at <= upTo}. */
   public List<ApplicationRow> followUpsAfter(long userId, Instant after, Instant upTo) {
-    return jdbc.sql(LIGHT + " WHERE a.user_id = :user AND a.follow_up_at > :after AND a.follow_up_at <= :upTo")
+    return jdbc.sql(LIGHT + " WHERE a.user_id = :user AND a.follow_up_at > :after AND a.follow_up_at <= :upTo"
+            + " ORDER BY a.follow_up_at ASC, a.id ASC LIMIT :limit")
+        .param("limit", MAX_PER_RANGE)
         .param("user", userId)
         .param("after", Db.ts(after))
         .param("upTo", Db.ts(upTo))

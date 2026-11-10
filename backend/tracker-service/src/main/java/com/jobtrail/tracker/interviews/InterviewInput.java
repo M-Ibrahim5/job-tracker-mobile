@@ -16,6 +16,9 @@ import java.util.Map;
 public record InterviewInput(Map<String, Object> values, List<Integer> reminderOffsets) {
 
   private static final String TOO_MANY = "At most 5 reminders";
+  /** Shortest and longest "minutes before the interview" a reminder may use (5 min to 30 days). */
+  public static final int MIN_REMINDER_OFFSET_MINUTES = 5;
+  public static final int MAX_REMINDER_OFFSET_MINUTES = 43200;
 
   public static InterviewInput parse(JsonNode json, boolean create) {
     JsonBody b = JsonBody.of(json);
@@ -50,9 +53,9 @@ public record InterviewInput(Map<String, Object> values, List<Integer> reminderO
 
     List<Integer> offsets = null;
     if (create && b.has("reminderOffsetsMinutes")) {
-      offsets = b.optionalIntList("reminderOffsetsMinutes", 5, 43200, TOO_MANY);
+      offsets = b.optionalIntList("reminderOffsetsMinutes", MIN_REMINDER_OFFSET_MINUTES, MAX_REMINDER_OFFSET_MINUTES, TOO_MANY);
     } else if (!create && b.has("reminderOffsetsMinutes")) {
-      offsets = b.requiredIntList("reminderOffsetsMinutes", 5, 43200, TOO_MANY);
+      offsets = b.requiredIntList("reminderOffsetsMinutes", MIN_REMINDER_OFFSET_MINUTES, MAX_REMINDER_OFFSET_MINUTES, TOO_MANY);
     }
     b.finish();
     return new InterviewInput(v, offsets == null ? null : List.copyOf(new LinkedHashSet<>(offsets)));

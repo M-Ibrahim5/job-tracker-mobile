@@ -35,6 +35,11 @@ public class HistoryRepository {
     return value == null ? null : ApplicationStatus.valueOf(value);
   }
 
+  /** Most status changes returned for one application. */
+  public static final int MAX_PER_APPLICATION = 200;
+  /** Most status changes returned for one calendar range. */
+  public static final int MAX_PER_RANGE = 1000;
+
   private final JdbcClient jdbc;
 
   public HistoryRepository(JdbcClient jdbc) {
@@ -65,9 +70,10 @@ public class HistoryRepository {
   public List<HistoryRow> forApplication(long userId, long applicationId) {
     return jdbc.sql("""
             SELECT * FROM status_history WHERE user_id = :user AND application_id = :app
-            ORDER BY changed_at ASC, id ASC""")
+            ORDER BY changed_at ASC, id ASC LIMIT :limit""")
         .param("user", userId)
         .param("app", applicationId)
+        .param("limit", MAX_PER_APPLICATION)
         .query(MAPPER)
         .list();
   }
@@ -101,10 +107,12 @@ public class HistoryRepository {
             SELECT h.*, a.company_name, a.job_title FROM status_history h
             JOIN job_applications a ON a.id = h.application_id
             WHERE h.user_id = :user AND h.from_status IS NOT NULL
-              AND h.changed_at >= :lo AND h.changed_at < :hi""")
+              AND h.changed_at >= :lo AND h.changed_at < :hi
+            ORDER BY h.changed_at ASC, h.id ASC LIMIT :limit""")
         .param("user", userId)
         .param("lo", Db.ts(lo))
         .param("hi", Db.ts(hi))
+        .param("limit", MAX_PER_RANGE)
         .query(JOINED)
         .list();
   }

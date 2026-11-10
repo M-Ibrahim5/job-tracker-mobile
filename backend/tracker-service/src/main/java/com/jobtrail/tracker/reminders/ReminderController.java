@@ -5,6 +5,7 @@ import com.jobtrail.common.security.CurrentUser;
 import com.jobtrail.common.time.TimeUtil;
 import com.jobtrail.tracker.applications.ApplicationRepository;
 import com.jobtrail.tracker.applications.ApplicationRow;
+import com.jobtrail.tracker.interviews.InterviewInput;
 import com.jobtrail.tracker.interviews.InterviewRepository;
 import com.jobtrail.tracker.interviews.InterviewRow;
 import com.jobtrail.tracker.settings.ReminderPrefs;
@@ -27,6 +28,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class ReminderController {
 
   private static final Duration HORIZON = Duration.ofDays(60);
+  /** Most upcoming interviews turned into reminders in one call. */
+  private static final int MAX_INTERVIEWS = 500;
 
   public record Item(String key, String kind, Instant fireAt, String title, String body, long applicationId,
       Long interviewId) {}
@@ -52,7 +55,9 @@ public class ReminderController {
     List<Item> items = new ArrayList<>();
 
     if (prefs.interviewRemindersEnabled()) {
-      for (InterviewRow i : interviews.pendingAfter(userId, now)) {
+      // Interviews further out than the horizon plus the longest offset cannot fire yet: leave them in the DB.
+      Instant lastWanted = horizon.plus(Duration.ofMinutes(InterviewInput.MAX_REMINDER_OFFSET_MINUTES));
+      for (InterviewRow i : interviews.pendingBetween(userId, now, lastWanted, MAX_INTERVIEWS)) {
         for (int offset : i.reminderOffsets()) {
           Instant fireAt = i.scheduledAt().minusSeconds(offset * 60L);
           if (!fireAt.isAfter(now) || fireAt.isAfter(horizon)) {
