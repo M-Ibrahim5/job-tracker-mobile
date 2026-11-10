@@ -31,7 +31,8 @@ final class StubService {
           : "{\"service\":\"" + name + "\",\"method\":\"" + exchange.getRequestMethod()
               + "\",\"uri\":\"" + exchange.getRequestURI() + "\",\"timezone\":\""
               + header(exchange.getRequestHeaders().getFirst("X-Timezone")) + "\",\"authorization\":\""
-              + header(exchange.getRequestHeaders().getFirst("Authorization")) + "\"}";
+              + header(exchange.getRequestHeaders().getFirst("Authorization")) + "\",\"internalKey\":\""
+              + header(exchange.getRequestHeaders().getFirst("X-Internal-Key")) + "\"}";
       byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
       exchange.getResponseHeaders().add("Content-Type", "application/json");
       exchange.sendResponseHeaders(200, bytes.length);

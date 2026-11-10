@@ -221,7 +221,7 @@ public class InterviewRepository {
   }
 
   /** Applies the patched fields in {@code v}; a clash on (application, time) raises DuplicateKeyException. */
-  public void update(long id, Map<String, Object> v, List<Integer> offsets) {
+  public void update(long userId, long id, Map<String, Object> v, List<Integer> offsets) {
     UpdateBuilder update = UpdateBuilder.table("interviews");
     COLUMNS.forEach((field, column) -> {
       if (v.containsKey(field)) {
@@ -231,7 +231,7 @@ public class InterviewRepository {
     if (offsets != null) {
       update.setJson("reminder_offsets", IntList.toJson(offsets));
     }
-    update.execute(jdbc, "id = :id", Map.of("id", id));
+    update.execute(jdbc, "id = :id AND user_id = :user", Map.of("id", id, "user", userId));
   }
 
   public int delete(long userId, long id) {

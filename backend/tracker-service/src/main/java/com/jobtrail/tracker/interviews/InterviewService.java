@@ -113,7 +113,7 @@ public class InterviewService {
     Instant now = Instant.now().truncatedTo(ChronoUnit.MILLIS);
     try {
       tx.executeWithoutResult(status -> {
-        interviews.update(id, input.values(), input.reminderOffsets());
+        interviews.update(userId, id, input.values(), input.reminderOffsets());
         reminders.syncInterview(userId, findOwned(userId, id), zone, prefs, now);
       });
     } catch (DuplicateKeyException e) {

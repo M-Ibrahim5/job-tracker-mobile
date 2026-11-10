@@ -17,7 +17,15 @@ public final class Iso {
   private static final Pattern DATE = Pattern.compile("^\\d{4}-\\d{2}-\\d{2}$");
   private static final Pattern DATE_TIME_PREFIX = Pattern.compile("^\\d{4}-\\d{2}-\\d{2}T.*");
 
+  /** Dates outside this range are refused: MySQL cannot store every year and nobody schedules these. */
+  private static final Instant EARLIEST = Instant.parse("2000-01-01T00:00:00Z");
+  private static final Instant LATEST = Instant.parse("2101-01-01T00:00:00Z");
+
   private Iso() {}
+
+  private static Instant inRange(Instant instant) {
+    return instant.isBefore(EARLIEST) || !instant.isBefore(LATEST) ? null : instant;
+  }
 
   public static String format(Instant instant) {
     return instant == null ? null : INSTANT.format(instant);
@@ -41,12 +49,12 @@ public final class Iso {
       return null;
     }
     try {
-      return OffsetDateTime.parse(text).toInstant();
+      return inRange(OffsetDateTime.parse(text).toInstant());
     } catch (DateTimeException ignored) {
       // fall through to the zone-less form
     }
     try {
-      return LocalDateTime.parse(text).toInstant(ZoneOffset.UTC);
+      return inRange(LocalDateTime.parse(text).toInstant(ZoneOffset.UTC));
     } catch (DateTimeException e) {
       return null;
     }

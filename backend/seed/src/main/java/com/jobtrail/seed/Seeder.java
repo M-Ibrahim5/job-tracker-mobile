@@ -15,7 +15,10 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
@@ -37,13 +40,29 @@ class Seeder implements CommandLineRunner {
   private final JdbcClient jdbc;
   private final TransactionTemplate tx;
 
-  Seeder(JdbcClient jdbc, TransactionTemplate tx) {
+  private final Environment env;
+  private final String dbUrl;
+
+  Seeder(JdbcClient jdbc, TransactionTemplate tx, Environment env,
+      @Value("${spring.datasource.url:}") String dbUrl) {
     this.jdbc = jdbc;
     this.tx = tx;
+    this.env = env;
+    this.dbUrl = dbUrl;
+  }
+
+  /** True for a JDBC URL that points at this machine. */
+  static boolean isLocalDatabase(String url) {
+    return url != null && url.matches("^jdbc:mysql://(localhost|127\\.0\\.0\\.1|\\[::1\\])[:/].*");
   }
 
   @Override
   public void run(String... args) {
+    // The demo account has a published password: never create it in production.
+    if (env.acceptsProfiles(Profiles.of("prod")) || !isLocalDatabase(dbUrl)) {
+      throw new IllegalStateException(
+          "Refusing to seed the demo account: it needs a local database and no prod profile");
+    }
     // Same parameters as the user service (argon2id, 64 MiB, 3 passes, 4 lanes).
     String hash = new Argon2PasswordEncoder(16, 32, 1, 19456, 2).encode(PASSWORD);
     List<App> apps = DemoData.apps();

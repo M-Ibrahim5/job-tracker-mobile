@@ -22,7 +22,7 @@ final class AvatarImages {
   /** Longest side of a stored avatar, in pixels. */
   static final int MAX_SIDE = 512;
   /** Refuse to decode larger images (a small file can declare huge dimensions). */
-  static final long MAX_SOURCE_PIXELS = 40_000_000L;
+  static final long MAX_SOURCE_PIXELS = 16_000_000L;
 
   private AvatarImages() {}
 

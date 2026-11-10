@@ -277,20 +277,21 @@ public class ApplicationRepository {
     return keys.getKey().longValue();
   }
 
-  public void update(long id, Map<String, Object> v) {
+  public void update(long userId, long id, Map<String, Object> v) {
     UpdateBuilder update = UpdateBuilder.table("job_applications");
     COLUMNS.forEach((field, column) -> {
       if (v.containsKey(field)) {
         update.set(column, v.get(field));
       }
     });
-    update.execute(jdbc, "id = :id", Map.of("id", id));
+    update.execute(jdbc, "id = :id AND user_id = :user", Map.of("id", id, "user", userId));
   }
 
-  public void updateStatus(long id, ApplicationStatus status) {
-    jdbc.sql("UPDATE job_applications SET status = :status WHERE id = :id")
+  public void updateStatus(long userId, long id, ApplicationStatus status) {
+    jdbc.sql("UPDATE job_applications SET status = :status WHERE id = :id AND user_id = :user")
         .param("status", status.name())
         .param("id", id)
+        .param("user", userId)
         .update();
   }
 

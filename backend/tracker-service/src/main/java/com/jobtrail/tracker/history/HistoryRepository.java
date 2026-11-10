@@ -62,8 +62,12 @@ public class HistoryRepository {
     return keys.getKey().longValue();
   }
 
-  public HistoryRow get(long id) {
-    return jdbc.sql("SELECT * FROM status_history WHERE id = :id").param("id", id).query(MAPPER).single();
+  public HistoryRow get(long userId, long id) {
+    return jdbc.sql("SELECT * FROM status_history WHERE id = :id AND user_id = :user")
+        .param("id", id)
+        .param("user", userId)
+        .query(MAPPER)
+        .single();
   }
 
   /** Oldest first. */

@@ -2,6 +2,8 @@ package com.jobtrail.user.user;
 
 import com.jobtrail.common.db.Db;
 import com.jobtrail.common.db.UpdateBuilder;
+import com.jobtrail.common.error.AppException;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.springframework.jdbc.core.RowMapper;
@@ -65,6 +67,21 @@ public class UserRepository {
         .param("hash", passwordHash)
         .param("id", id)
         .update();
+  }
+
+  /**
+   * Reads the avatar path (null when there is none) and locks the user row until the surrounding
+   * transaction ends. Throws 404 when the user is gone.
+   */
+  public String lockAvatarPath(long id) {
+    List<String> rows = jdbc.sql("SELECT avatar_path FROM users WHERE id = :id FOR UPDATE")
+        .param("id", id)
+        .query((rs, i) -> rs.getString("avatar_path"))
+        .list();
+    if (rows.isEmpty()) {
+      throw AppException.notFound("User not found");
+    }
+    return rows.get(0);
   }
 
   public void setAvatarPath(long id, String path) {

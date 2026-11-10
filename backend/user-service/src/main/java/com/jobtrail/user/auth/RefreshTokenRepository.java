@@ -109,12 +109,22 @@ public class RefreshTokenRepository {
     if (keepHash == null) {
       return revokeAll(userId, now);
     }
-    return jdbc.sql("""
+    int revoked = jdbc.sql("""
             UPDATE refresh_tokens SET revoked_at = :now
             WHERE user_id = :user AND revoked_at IS NULL AND token_hash <> :keep""")
         .param("now", Db.ts(now))
         .param("user", userId)
         .param("keep", keepHash)
         .update();
+    // The kept token's predecessor could still trade itself in during the rotation grace and retire
+    // it. After a password change that old token must count as reuse instead.
+    jdbc.sql("""
+            UPDATE refresh_tokens old JOIN refresh_tokens kept ON old.replaced_by = kept.id
+            SET old.rotated_at = NULL
+            WHERE kept.user_id = :user AND kept.token_hash = :keep""")
+        .param("user", userId)
+        .param("keep", keepHash)
+        .update();
+    return revoked;
   }
 }

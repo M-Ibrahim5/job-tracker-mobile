@@ -116,7 +116,7 @@ public class ApplicationService {
     ReminderPrefs prefs = reminderChanged ? settings.prefsFor(userId) : null;
     Instant now = Instant.now().truncatedTo(ChronoUnit.MILLIS);
     tx.executeWithoutResult(s -> {
-      applications.update(id, values);
+      applications.update(userId, id, values);
       if (reminderChanged) {
         ApplicationRow after = findOwned(userId, id);
         reminders.syncFollowUp(userId, id, after.companyName(), after.jobTitle(), after.followUpAt(), prefs, now);
@@ -142,14 +142,14 @@ public class ApplicationService {
     ReminderPrefs prefs = settings.prefsFor(userId);
     Instant now = Instant.now().truncatedTo(ChronoUnit.MILLIS);
     HistoryRow entry = tx.execute(s -> {
-      applications.updateStatus(id, change.status());
+      applications.updateStatus(userId, id, change.status());
       long historyId = history.insert(userId, id, existing.status(), change.status(), now, change.note());
       if (prefs.statusAlertsEnabled()) {
         notifications.insert(new NewNotification(userId, NotificationType.statusChange,
             ReminderText.statusChangeTitle(change.status().label()),
             ReminderText.statusChangeBody(existing.companyName(), existing.jobTitle()), id, null, now));
       }
-      return history.get(historyId);
+      return history.get(userId, historyId);
     });
     return new StatusChangeResult(get(userId, id), HistoryDto.from(entry));
   }

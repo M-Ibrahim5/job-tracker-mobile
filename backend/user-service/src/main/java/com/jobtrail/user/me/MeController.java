@@ -13,6 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -36,8 +37,11 @@ public class MeController {
   private final AuthService auth;
   private final AvatarStorage avatars;
   private final UserProperties props;
+  private final TransactionTemplate tx;
 
-  public MeController(UserRepository users, AuthService auth, AvatarStorage avatars, UserProperties props) {
+  public MeController(UserRepository users, AuthService auth, AvatarStorage avatars, UserProperties props,
+      TransactionTemplate tx) {
+    this.tx = tx;
     this.users = users;
     this.auth = auth;
     this.avatars = avatars;
@@ -98,10 +102,14 @@ public class MeController {
     }
     // Store a re-encoded copy: strips metadata such as GPS location and anything hidden in the file.
     byte[] clean = AvatarImages.normalise(bytes, extension).orElseThrow(MeController::badImage);
-    UserRow user = current(userId);
-    String path = avatars.save(userId, clean, extension);
-    users.setAvatarPath(userId, path);
-    avatars.delete(user.avatarPath());
+    current(userId);
+    // Uploads by one user run one after the other: each replaces exactly the avatar it found, so two
+    // at once cannot leave an orphaned image behind.
+    tx.executeWithoutResult(status -> {
+      String old = users.lockAvatarPath(userId);
+      users.setAvatarPath(userId, avatars.save(userId, clean, extension));
+      avatars.delete(old);
+    });
     return dto(current(userId));
   }
 

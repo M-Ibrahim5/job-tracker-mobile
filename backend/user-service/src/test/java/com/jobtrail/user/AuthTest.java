@@ -131,6 +131,22 @@ class AuthTest extends IntegrationTest {
   }
 
   @Test
+  void aPasswordChangeEndsTheGraceOfTheTokenItKept() throws Exception {
+    JsonNode auth = register("change@example.com");
+    String first = auth.get("refreshToken").asText();
+    JsonNode rotated = body(post("/api/v1/auth/refresh", null, Map.of("refreshToken", first))
+        .andExpect(status().isOk()));
+    String second = rotated.get("refreshToken").asText();
+
+    // Within the 30 s grace, an older token could still trade itself in and retire the kept one.
+    post("/api/v1/auth/change-password", rotated.get("accessToken").asText(),
+        Map.of("currentPassword", PASSWORD, "newPassword", "N3w-Passw0rd!", "refreshToken", second))
+        .andExpect(status().isNoContent());
+
+    post("/api/v1/auth/refresh", null, Map.of("refreshToken", first)).andExpect(status().isUnauthorized());
+  }
+
+  @Test
   void aLoggedOutTokenGetsNoGrace() throws Exception {
     String token = register("out@example.com").get("refreshToken").asText();
     post("/api/v1/auth/logout", null, Map.of("refreshToken", token)).andExpect(status().isNoContent());

@@ -102,4 +102,12 @@ class GatewayRoutingTest {
         .jsonPath("$.services.user").isEqualTo("up")
         .jsonPath("$.services.tracker").isEqualTo("up");
   }
+
+  @Test
+  void aClientCannotPresentTheInternalKeyToAService() {
+    client.get().uri("/api/v1/applications").header("X-Internal-Key", "guessed-key")
+        .exchange()
+        .expectStatus().isOk()
+        .expectBody().jsonPath("$.internalKey").isEqualTo("");
+  }
 }

@@ -22,7 +22,14 @@ public class AccessTokenReader {
 
   private final JwtParser parser;
 
+  /** The value shipped in backend/.env.example; anyone can mint tokens with it. */
+  private static final String EXAMPLE_SECRET = "change-me-to-a-long-random-string-0000";
+
   public AccessTokenReader(@Value("${jobtrail.jwt.secret:}") String secret) {
+    if (EXAMPLE_SECRET.equals(secret)) {
+      throw new IllegalStateException(
+          "JWT_SECRET is the public example value. Generate your own, e.g. `openssl rand -base64 48`");
+    }
     this.parser = secret == null || secret.length() < MIN_SECRET_CHARS
         ? null
         : Jwts.parser().verifyWith(Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8))).build();

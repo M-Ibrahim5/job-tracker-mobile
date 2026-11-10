@@ -9,6 +9,9 @@ spring:
     gateway:
       server:
         webflux:
+          # Clients must never be able to present the service-to-service key.
+          default-filters:
+            - RemoveRequestHeader=X-Internal-Key
           # Connections to the services: pooled connections are dropped before Tomcat's keep-alive
           # timeout (60s, jobtrail-common.yml) so the gateway never reuses one the service is closing
           # ("Connection prematurely closed BEFORE response" -> 500 under load). A stuck service
