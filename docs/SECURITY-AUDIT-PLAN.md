@@ -246,7 +246,7 @@ Fill in as you go. "Result" is one of: fixed, not reproduced (test passed before
 | 5 Account-switch cache | fixed | e1a4a38 | Reproduced first: all 4 tests failed. Per-user providers watch `currentUserIdProvider`. |
 | 6 Unbounded reads | fixed | 09b7a64 | Reproduced first: 603 rows loaded for 3 reminders. Per-user creation caps (step 4) deferred: API change, needs a decision. |
 | 7 H1-H4, H11-H13, H16, H17 | fixed | 20aa3c7 | H4 reproduced first (200 instead of 401). H3 note: access tokens issued before this change count as expired once, and the app refreshes. H12 limit is now 16 MP. H16 range is 2000-2100. |
-| 7 H5-H10, H14, H15 | fixed | see git log | H7: iOS keychain items use `first_unlock_this_device`; items saved with the old setting may need one sign-in again. H9: export files are deleted before the next export and after sign-out. |
+| 7 H5-H10, H14, H15 | fixed | 7a99336 | H7: iOS keychain items use `first_unlock_this_device`; items saved with the old setting may need one sign-in again. H9: export files are deleted before the next export and after sign-out. |
 
 Checks at the end: `mvn verify` passes for common, user-service, tracker-service, gateway and seed. The `e2e` module does not compile, with or without these changes (`HappyPathE2ETest.java:55`, "IOException is never thrown"): it is unrelated and left alone. App: `flutter analyze` clean, 527 tests pass.
 
